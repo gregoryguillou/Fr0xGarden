@@ -84,7 +84,7 @@ contract TwoSlotsOption is Ownable {
     }
 
     /// @notice Calculate fees to be deducted from a given amount
-    /// @dev Fee amount by dividing the numerator by the denominator which - e.g: 3/1000 = 0.003 or 0.3% percent;
+    /// @dev Fee amount by dividing the numerator by the denominator which - e.g: 3/100 = 0.03 or 3% percent;
     /// @param _amount amount between 1e15 & 1e20.
     /// @return fees amount in wei
     function getFeeByAmount(uint96 _amount) public view returns (uint256) {
