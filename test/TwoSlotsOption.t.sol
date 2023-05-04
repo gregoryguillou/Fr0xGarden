@@ -4,8 +4,6 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
-error ContestIsAlreadyOpen();
-
 contract TwoSlotsOptionTest is Test {
     TwoSlotsOption public twoSlotsOption;
     uint256 mainnetFork;

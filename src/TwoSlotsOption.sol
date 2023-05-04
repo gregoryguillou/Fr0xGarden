@@ -128,7 +128,11 @@ contract TwoSlotsOption is Ownable {
         LAST_OPEN_CONTEST_ID = _id;
     }
 
-    function getContestStartingPrice(uint256 _contestID) public view returns (uint256) {
+    function getContestStatus(uint256 _contestID) external view returns (ContestStatus) {
+        return contests[_contestID].contestStatus;
+    }
+
+    function getContestStartingPrice(uint256 _contestID) external view returns (uint256) {
         return contests[_contestID].startingPrice;
     }
 
