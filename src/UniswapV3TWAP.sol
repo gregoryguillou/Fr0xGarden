@@ -3,7 +3,6 @@ pragma solidity ^0.8.17;
 
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-
 import {OracleLibrary} from "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 
 contract UniswapV3TWAP {
@@ -14,7 +13,6 @@ contract UniswapV3TWAP {
     constructor(address _factory, address _token0, address _token1, uint24 _fee) {
         token0 = _token0;
         token1 = _token1;
-
         address _pool = IUniswapV3Factory(_factory).getPool(_token0, _token1, _fee);
         require(_pool != address(0), "pool doesn't exist");
 
