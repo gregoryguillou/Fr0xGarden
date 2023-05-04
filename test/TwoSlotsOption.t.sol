@@ -18,13 +18,12 @@ contract TwoSlotsOptionTest is Test {
     function setUp() public {
         string memory MAINNET_RPC_URL = vm.envString("MAINNET_RPC_URL");
         mainnetFork = vm.createFork(MAINNET_RPC_URL);
-    }
-
-    function test_GetFeeByAmount(uint96 _amount) public {
         vm.selectFork(mainnetFork);
         twoSlotsOption =
         new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
+    }
 
+    function test_GetFeeByAmount(uint96 _amount) public {
         vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= twoSlotsOption.MAX_BET());
         uint256 expected = _amount * twoSlotsOption.FEE_NUMERATOR() / twoSlotsOption.FEE_DENOMINATOR();
         emit log_named_uint("Amount Expected: ", expected);
@@ -32,18 +31,12 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test_CreateContest() public {
-        vm.selectFork(mainnetFork);
-        twoSlotsOption =
-        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
         uint256 expected = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         twoSlotsOption.createContest();
         assertLt(expected, twoSlotsOption.LAST_OPEN_CONTEST_ID());
     }
 
     function test_CreateContest_CheckIfNewContestGetStartPrice() public {
-        vm.selectFork(mainnetFork);
-        twoSlotsOption =
-        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestStartingPrice(1);
         emit log_named_uint("price", price);
@@ -51,9 +44,6 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test_CreateContest_RevertIfContestIsAlreadyOpen() public {
-        vm.selectFork(mainnetFork);
-        twoSlotsOption =
-        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
         vm.warp(1641070800);
         twoSlotsOption.createContest();
         vm.expectRevert(
