@@ -2,13 +2,34 @@
 pragma solidity ^0.8.17;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UniswapV3TWAP} from "src/UniswapV3TWAP.sol";
 
 /// @title TwoSlotsOption
 /// @author @fr0xMaster
 /// @notice Mutual Slots implementation of Two Slots Option contract.
 
+/// @notice Status of a Contest. The status can alternate between 3 different states.
+// OPEN is the default status when a new Contest is created. In this status, if the contest is not mature, users can buy a slot option.
+// RESOLVED is the status assigned once the Contest has reached maturity and a winning slot has been determined in favor of a loser.
+// REFUNDABLE is the status assigned once the v has reached its maturity but the conditions are not met to determine a winner.
+enum ContestStatus {
+    UNDEFINED,
+    OPEN,
+    RESOLVED,
+    REFUNDABLE
+}
+
+enum WinningSlot {
+    UNDEFINED,
+    LESS,
+    MORE
+}
+
 contract TwoSlotsOption is Ownable {
+    using SafeERC20 for IERC20;
+
     address public immutable FACTORY;
     address public immutable TOKEN0;
     address public immutable TOKEN1;
@@ -23,8 +44,6 @@ contract TwoSlotsOption is Ownable {
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
     uint256 public lastCloseContestID; // ID of last contest close. To be close a contest need to be Resolved or Refundable
     mapping(uint256 => Contest) contests; //mapping of all contests formatted as struct.
-
-    //TODO Add a link to the desired contract token (arb,eth,etc..)
 
     constructor(
         address _FACTORY,
@@ -51,30 +70,15 @@ contract TwoSlotsOption is Ownable {
         uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
     }
 
-    /// @notice Status of a Contest. The status can alternate between 3 different states.
-    // OPEN is the default status when a new Contest is created. In this status, if the contest is not mature, users can buy a slot option.
-    // RESOLVED is the status assigned once the Contest has reached maturity and a winning slot has been determined in favor of a loser.
-    // REFUNDABLE is the status assigned once the v has reached its maturity but the conditions are not met to determine a winner.
-    enum ContestStatus {
-        OPEN,
-        RESOLVED,
-        REFUNDABLE
-    }
-
     /// @notice Status of an Option. The status can alternate between 3 different states.
     // CREATED is the default status when a new Option is created. This status defines that an Option has been created and is attached to an address.
     // CLAIMED status is assigned to a winning Option and claimed by the linked address.
     // REFUND status is assigned when an Option has no winner and the linked address has been refunded its initial Option.
     enum OptionStatus {
+        UNDEFINED,
         CREATED,
         CLAIMED,
         REFUND
-    }
-
-    enum WinningSlot {
-        UNDEFINED,
-        LESS,
-        MORE
     }
 
     struct Option {
@@ -96,13 +100,16 @@ contract TwoSlotsOption is Ownable {
         address creator; // Address who created contest. Will receive a share of the fees generated.
         address resolver; // Address who resolve contest. Will receive a share of the fees generated.
         uint256 startingPrice; // Token price at contest creation
-        uint256 maturyityPrice; // Token price at contest maturity
+        uint256 maturityPrice; // Token price at contest maturity
         WinningSlot winningSlot; // Defines the winning slot once the Contest is resolved
         Slot slotLess;
         Slot slotMore;
     }
 
     error ContestIsAlreadyOpen(uint256 LAST_OPEN_CONTEST_ID);
+    error ContestNotOpenToBets();
+    error InsufficientBalance();
+    error InsufficientAllowance();
 
     modifier isCreateable() {
         if (
@@ -114,7 +121,30 @@ contract TwoSlotsOption is Ownable {
         _;
     }
 
+    modifier isContestOpen(uint256 _contestID) {
+        if (contests[_contestID].contestStatus != ContestStatus.OPEN || block.timestamp > contests[_contestID].closeAt)
+        {
+            revert ContestNotOpenToBets();
+        }
+        _;
+    }
+
+    modifier isSufficientBalance(uint256 _amountToBet) {
+        if (IERC20(TOKEN0).balanceOf(msg.sender) < _amountToBet) {
+            revert InsufficientBalance();
+        }
+        _;
+    }
+
+    modifier isSufficientAllowance(uint256 _amountToBet) {
+        if (IERC20(TOKEN0).allowance(msg.sender, address(this)) < _amountToBet) {
+            revert InsufficientAllowance();
+        }
+        _;
+    }
+
     event CreateContest(uint256 indexed _contestID, address indexed _creator);
+    event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, bool _isSlotMore);
 
     /// @notice Calculate fees to be deducted from a given amount
     /// @dev Fee amount by dividing the numerator by the denominator which - e.g: 3/100 = 0.03 or 3% percent;
@@ -132,8 +162,16 @@ contract TwoSlotsOption is Ownable {
         return contests[_contestID].contestStatus;
     }
 
+    function getContestWinningSlot(uint256 _contestID) external view returns (WinningSlot) {
+        return contests[_contestID].winningSlot;
+    }
+
     function getContestStartingPrice(uint256 _contestID) external view returns (uint256) {
         return contests[_contestID].startingPrice;
+    }
+
+    function getContestMaturityPrice(uint256 _contestID) external view returns (uint256) {
+        return contests[_contestID].maturityPrice;
     }
 
     function getContestCloseAtTimestamp(uint256 _contestID) external view returns (uint256) {
@@ -142,6 +180,14 @@ contract TwoSlotsOption is Ownable {
 
     function getContestMaturityAtTimestamp(uint256 _contestID) external view returns (uint256) {
         return contests[_contestID].maturityAt;
+    }
+
+    function getContestCreator(uint256 _contestID) external view returns (address) {
+        return contests[_contestID].creator;
+    }
+
+    function getContestResolver(uint256 _contestID) external view returns (address) {
+        return contests[_contestID].resolver;
     }
 
     function createContest() external isCreateable returns (bool) {
@@ -154,6 +200,47 @@ contract TwoSlotsOption is Ownable {
         contests[newContestID].startingPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 10 ** 18, 32);
         setLastOpenContestID(newContestID);
         emit CreateContest(newContestID, msg.sender);
+        return true;
+    }
+
+    function bet(uint256 _contestID, uint256 _amountToBet, bool _isSlotMore)
+        external
+        isContestOpen(_contestID)
+        isSufficientBalance(_amountToBet)
+        isSufficientAllowance(_amountToBet)
+        returns (bool)
+    {
+        uint256 amountInSlotMoreBeforeBet = contests[_contestID].slotMore.totalAmount;
+        uint256 amountInSlotLessBeforeBet = contests[_contestID].slotLess.totalAmount;
+
+        if (_isSlotMore) {
+            bool isUserAlreadyBetInSlotMore =
+                contests[_contestID].slotMore.options[msg.sender].optionStatus == OptionStatus.CREATED;
+            contests[_contestID].slotMore.totalAmount = amountInSlotMoreBeforeBet + _amountToBet;
+
+            if (!isUserAlreadyBetInSlotMore) {
+                contests[_contestID].slotMore.options[msg.sender].optionStatus = OptionStatus.CREATED;
+                contests[_contestID].slotMore.options[msg.sender].amount = _amountToBet;
+            } else {
+                uint256 amountAlreadyBetByUserInSlotMore = contests[_contestID].slotMore.options[msg.sender].amount;
+                contests[_contestID].slotMore.options[msg.sender].amount =
+                    amountAlreadyBetByUserInSlotMore + _amountToBet;
+            }
+        } else {
+            bool isUserAlreadyBetInSlotLess =
+                contests[_contestID].slotLess.options[msg.sender].optionStatus == OptionStatus.CREATED;
+            contests[_contestID].slotLess.totalAmount = amountInSlotLessBeforeBet + _amountToBet;
+
+            if (!isUserAlreadyBetInSlotLess) {
+                contests[_contestID].slotLess.options[msg.sender].optionStatus = OptionStatus.CREATED;
+                contests[_contestID].slotLess.options[msg.sender].amount = _amountToBet;
+            } else {
+                uint256 amountAlreadyBetByUserInSlotLess = contests[_contestID].slotLess.options[msg.sender].amount;
+                contests[_contestID].slotLess.options[msg.sender].amount =
+                    amountAlreadyBetByUserInSlotLess + _amountToBet;
+            }
+        }
+        emit Bet(_contestID, msg.sender, _amountToBet, _isSlotMore);
         return true;
     }
 }

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
+import {ContestStatus, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
     TwoSlotsOption public twoSlotsOption;
@@ -34,11 +34,28 @@ contract TwoSlotsOptionTest is Test {
         assertLt(expected, twoSlotsOption.LAST_OPEN_CONTEST_ID());
     }
 
+    function test_CreateContest_CheckContestStatus() public {
+        twoSlotsOption.createContest();
+        assertTrue(ContestStatus.OPEN == twoSlotsOption.getContestStatus(1));
+    }
+
+    function test_CreateContest_CheckWinningSlot() public {
+        twoSlotsOption.createContest();
+        assertTrue(WinningSlot.UNDEFINED == twoSlotsOption.getContestWinningSlot(1));
+    }
+
     function test_CreateContest_CheckIfNewContestGetStartPrice() public {
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestStartingPrice(1);
-        emit log_named_uint("price", price);
+        emit log_named_uint("Starting Price", price);
         assertGe(price, 0);
+    }
+
+    function test_CreateContest_CheckNewContestMaturityPrice() public {
+        twoSlotsOption.createContest();
+        uint256 price = twoSlotsOption.getContestMaturityPrice(1);
+        emit log_named_uint("Maturity Price", price);
+        assertEq(price, 0);
     }
 
     function test_CreateContest_CheckNewContestCloseAtTimeStamp() public {
@@ -57,6 +74,21 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
     }
 
+    function test_CreateContest_CheckContestCreator() public {
+        address alice = makeAddr("alice");
+        vm.prank(alice);
+        twoSlotsOption.createContest();
+        emit log_named_address("Creator", alice);
+        assertEq(alice, twoSlotsOption.getContestCreator(1));
+    }
+
+    function test_CreateContest_CheckContestResolver() public {
+        address expectedResolver;
+        twoSlotsOption.createContest();
+        emit log_named_address("Resolver", twoSlotsOption.getContestResolver(1));
+        assertEq(expectedResolver, twoSlotsOption.getContestResolver(1));
+    }
+
     function test_CreateContest_RevertIfContestIsAlreadyOpen() public {
         vm.warp(1641070800);
         twoSlotsOption.createContest();
@@ -66,8 +98,4 @@ contract TwoSlotsOptionTest is Test {
         vm.warp(1641070800 + 9 minutes);
         twoSlotsOption.createContest();
     }
-
-    //TODO: Check if a contest is cretaed with the right cretor address
-    //TODO: Check if a new contest  have Ox0 address when created
-    //TODO: Check if a new contest  have a maturity price to 0
 }
