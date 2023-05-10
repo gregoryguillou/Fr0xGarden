@@ -136,6 +136,14 @@ contract TwoSlotsOption is Ownable {
         return contests[_contestID].startingPrice;
     }
 
+    function getContestCloseAtTimestamp(uint256 _contestID) external view returns (uint256) {
+        return contests[_contestID].closeAt;
+    }
+
+    function getContestMaturityAtTimestamp(uint256 _contestID) external view returns (uint256) {
+        return contests[_contestID].maturityAt;
+    }
+
     function createContest() external isCreateable returns (bool) {
         uint256 newContestID = LAST_OPEN_CONTEST_ID + 1;
         contests[newContestID].contestStatus = ContestStatus.OPEN;

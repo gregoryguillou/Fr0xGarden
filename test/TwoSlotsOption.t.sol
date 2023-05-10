@@ -41,6 +41,22 @@ contract TwoSlotsOptionTest is Test {
         assertGe(price, 0);
     }
 
+    function test_CreateContest_CheckNewContestCloseAtTimeStamp() public {
+        vm.warp(1641070800);
+        twoSlotsOption.createContest();
+        uint256 expectedCloseAtTimestamp = 1641070800 + 10 minutes;
+        emit log_named_uint("Close At", expectedCloseAtTimestamp);
+        assertEq(expectedCloseAtTimestamp, twoSlotsOption.getContestCloseAtTimestamp(1));
+    }
+
+    function test_CreateContest_CheckNewContestMaturityAtTimeStamp() public {
+        vm.warp(1641070800);
+        twoSlotsOption.createContest();
+        uint256 expectedMaturityAtTimestamp = 1641070800 + 20 minutes;
+        emit log_named_uint("Close At", expectedMaturityAtTimestamp);
+        assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
+    }
+
     function test_CreateContest_RevertIfContestIsAlreadyOpen() public {
         vm.warp(1641070800);
         twoSlotsOption.createContest();
@@ -50,4 +66,8 @@ contract TwoSlotsOptionTest is Test {
         vm.warp(1641070800 + 9 minutes);
         twoSlotsOption.createContest();
     }
+
+    //TODO: Check if a contest is cretaed with the right cretor address
+    //TODO: Check if a new contest  have Ox0 address when created
+    //TODO: Check if a new contest  have a maturity price to 0
 }
