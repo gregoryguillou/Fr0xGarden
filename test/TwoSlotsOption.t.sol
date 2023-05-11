@@ -11,6 +11,8 @@ contract TwoSlotsOptionTest is Test {
     address FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address TOKEN0 = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address TOKEN1 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    uint256 public constant FIVE_USDC = 5e6; // 5 dollars in USDC  exponential notation of 6 decimals
+    uint256 public constant TEN_THOUSAND_USDC = 1e10; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint24 UNISWAP_POOL_FEE = 3000;
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
 
@@ -19,7 +21,7 @@ contract TwoSlotsOptionTest is Test {
         mainnetFork = vm.createFork(MAINNET_RPC_URL);
         vm.selectFork(mainnetFork);
         twoSlotsOption =
-        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
+        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, FIVE_USDC, TEN_THOUSAND_USDC, 10 minutes);
     }
 
     function test_getFeeByAmount_FuzzTestCalculations(uint96 _amount) public {
@@ -99,6 +101,11 @@ contract TwoSlotsOptionTest is Test {
         twoSlotsOption.createContest();
     }
 
+    function test_Bet_RevertIfContestNotInOpenStatus() public {
+        vm.expectRevert(TwoSlotsOption.ContestNotOpen.selector);
+        twoSlotsOption.bet(3, FIVE_USDC, true);
+    }
+
     function test_Bet_RevertIfContestNotInBettingPeriod() public {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
@@ -108,6 +115,37 @@ contract TwoSlotsOptionTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.BettingPeriodExpired.selector, block.timestamp, lastContestCloseAt)
         );
-        twoSlotsOption.bet(lastContestID, 100, true);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, true);
+    }
+
+    function test_Bet_FuzzRevertIfAmountBetIsLessThanOfMinBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, 0, 4_999_999);
+        _amountToBet = bound(_amountToBet, 10_000_000_001, 1e18);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TwoSlotsOption.BetAmountOutOfRange.selector,
+                _amountToBet,
+                twoSlotsOption.MIN_BET(),
+                twoSlotsOption.MAX_BET()
+            )
+        );
+        twoSlotsOption.bet(lastContestID, _amountToBet, true);
+    }
+
+    function test_Bet_FuzzRevertIfAmountBetIsMoreThanOfMaxBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, 10_000_000_001, 1e18);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TwoSlotsOption.BetAmountOutOfRange.selector,
+                _amountToBet,
+                twoSlotsOption.MIN_BET(),
+                twoSlotsOption.MAX_BET()
+            )
+        );
+        twoSlotsOption.bet(lastContestID, _amountToBet, true);
     }
 }
