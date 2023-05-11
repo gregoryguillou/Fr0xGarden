@@ -21,44 +21,44 @@ contract TwoSlotsOptionTest is Test {
         new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
     }
 
-    function test_GetFeeByAmount(uint96 _amount) public {
+    function getFeeByAmount_FuzzTestCalculations(uint96 _amount) public {
         vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= twoSlotsOption.MAX_BET());
         uint256 expected = _amount * twoSlotsOption.FEE_NUMERATOR() / twoSlotsOption.FEE_DENOMINATOR();
         emit log_named_uint("Amount Expected: ", expected);
         assertEq(twoSlotsOption.getFeeByAmount(_amount), expected);
     }
 
-    function test_CreateContest() public {
+    function createContest_CheckIfNewContestCreated() public {
         uint256 expected = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         twoSlotsOption.createContest();
         assertLt(expected, twoSlotsOption.LAST_OPEN_CONTEST_ID());
     }
 
-    function test_CreateContest_CheckContestStatus() public {
+    function createContest_CheckContestStatus() public {
         twoSlotsOption.createContest();
         assertTrue(ContestStatus.OPEN == twoSlotsOption.getContestStatus(1));
     }
 
-    function test_CreateContest_CheckWinningSlot() public {
+    function createContest_CheckWinningSlot() public {
         twoSlotsOption.createContest();
         assertTrue(WinningSlot.UNDEFINED == twoSlotsOption.getContestWinningSlot(1));
     }
 
-    function test_CreateContest_CheckIfNewContestGetStartPrice() public {
+    function createContest_CheckIfNewContestGetStartPrice() public {
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestStartingPrice(1);
         emit log_named_uint("Starting Price", price);
         assertGe(price, 0);
     }
 
-    function test_CreateContest_CheckNewContestMaturityPrice() public {
+    function createContest_CheckNewContestMaturityPrice() public {
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestMaturityPrice(1);
         emit log_named_uint("Maturity Price", price);
         assertEq(price, 0);
     }
 
-    function test_CreateContest_CheckNewContestCloseAtTimeStamp() public {
+    function createContest_CheckNewContestCloseAtTimeStamp() public {
         vm.warp(1641070800);
         twoSlotsOption.createContest();
         uint256 expectedCloseAtTimestamp = 1641070800 + 10 minutes;
@@ -66,7 +66,7 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedCloseAtTimestamp, twoSlotsOption.getContestCloseAtTimestamp(1));
     }
 
-    function test_CreateContest_CheckNewContestMaturityAtTimeStamp() public {
+    function createContest_CheckNewContestMaturityAtTimeStamp() public {
         vm.warp(1641070800);
         twoSlotsOption.createContest();
         uint256 expectedMaturityAtTimestamp = 1641070800 + 20 minutes;
@@ -74,7 +74,7 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
     }
 
-    function test_CreateContest_CheckContestCreator() public {
+    function createContest_CheckContestCreator() public {
         address alice = makeAddr("alice");
         vm.prank(alice);
         twoSlotsOption.createContest();
@@ -82,14 +82,14 @@ contract TwoSlotsOptionTest is Test {
         assertEq(alice, twoSlotsOption.getContestCreator(1));
     }
 
-    function test_CreateContest_CheckContestResolver() public {
+    function createContest_CheckContestResolver() public {
         address expectedResolver;
         twoSlotsOption.createContest();
         emit log_named_address("Resolver", twoSlotsOption.getContestResolver(1));
         assertEq(expectedResolver, twoSlotsOption.getContestResolver(1));
     }
 
-    function test_CreateContest_RevertIfContestIsAlreadyOpen() public {
+    function createContest_RevertIfContestIsAlreadyOpen() public {
         vm.warp(1641070800);
         twoSlotsOption.createContest();
         vm.expectRevert(
