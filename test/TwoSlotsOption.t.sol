@@ -7,6 +7,7 @@ import {ContestStatus, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.
 contract TwoSlotsOptionTest is Test {
     TwoSlotsOption public twoSlotsOption;
     uint256 mainnetFork;
+    uint256 FIRST_MAY_2023 = 1682892000;
     address FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address TOKEN0 = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address TOKEN1 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -59,17 +60,17 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function createContest_CheckNewContestCloseAtTimeStamp() public {
-        vm.warp(1641070800);
+        vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
-        uint256 expectedCloseAtTimestamp = 1641070800 + 10 minutes;
+        uint256 expectedCloseAtTimestamp = FIRST_MAY_2023 + 10 minutes;
         emit log_named_uint("Close At", expectedCloseAtTimestamp);
         assertEq(expectedCloseAtTimestamp, twoSlotsOption.getContestCloseAtTimestamp(1));
     }
 
     function createContest_CheckNewContestMaturityAtTimeStamp() public {
-        vm.warp(1641070800);
+        vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
-        uint256 expectedMaturityAtTimestamp = 1641070800 + 20 minutes;
+        uint256 expectedMaturityAtTimestamp = FIRST_MAY_2023 + 20 minutes;
         emit log_named_uint("Close At", expectedMaturityAtTimestamp);
         assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
     }
@@ -90,12 +91,14 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function createContest_RevertIfContestIsAlreadyOpen() public {
-        vm.warp(1641070800);
+        vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.ContestIsAlreadyOpen.selector, twoSlotsOption.LAST_OPEN_CONTEST_ID())
         );
-        vm.warp(1641070800 + 9 minutes);
+        vm.warp(FIRST_MAY_2023 + 9 minutes);
         twoSlotsOption.createContest();
     }
+
+    //function bet_RevertIfContestIsNotOpenToBet() public {}
 }

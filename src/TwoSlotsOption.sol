@@ -121,7 +121,7 @@ contract TwoSlotsOption is Ownable {
         _;
     }
 
-    modifier isContestOpen(uint256 _contestID) {
+    modifier isContestOpenToBet(uint256 _contestID) {
         if (contests[_contestID].contestStatus != ContestStatus.OPEN || block.timestamp > contests[_contestID].closeAt)
         {
             revert ContestNotOpenToBets();
@@ -205,7 +205,7 @@ contract TwoSlotsOption is Ownable {
 
     function bet(uint256 _contestID, uint256 _amountToBet, bool _isSlotMore)
         external
-        isContestOpen(_contestID)
+        isContestOpenToBet(_contestID)
         isSufficientBalance(_amountToBet)
         isSufficientAllowance(_amountToBet)
         returns (bool)
