@@ -3,10 +3,13 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ContestStatus, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
+    using SafeERC20 for IERC20;
+
     TwoSlotsOption public twoSlotsOption;
     uint256 arbitrumFork;
     uint256 FIRST_MAY_2023 = 1682892000;
@@ -161,5 +164,21 @@ contract TwoSlotsOptionTest is Test {
         );
         vm.prank(alice);
         twoSlotsOption.bet(lastContestID, TEN_THOUSAND_USDC, true);
+    }
+
+    function test_Bet_FuzzRevertIfUserAllowanceIsLessThanAmountToBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, TEN_THOUSAND_USDC);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        deal(TOKEN0, alice, _amountToBet);
+        vm.prank(alice);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), FIVE_USDC - 1);
+        uint256 contractAllowance = IERC20(TOKEN0).allowance(alice, address(twoSlotsOption));
+        emit log_named_uint("Contract Allowance", contractAllowance);
+        vm.expectRevert(
+            abi.encodeWithSelector(TwoSlotsOption.InsufficientAllowance.selector, contractAllowance, _amountToBet)
+        );
+        vm.prank(alice);
+        twoSlotsOption.bet(lastContestID, _amountToBet, true);
     }
 }

@@ -111,7 +111,7 @@ contract TwoSlotsOption is Ownable {
     error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
     error BetAmountOutOfRange(uint256 amountBet, uint256 minBet, uint256 maxBet);
     error InsufficientBalance(uint256 userBalance, uint256 amountBet);
-    error InsufficientAllowance();
+    error InsufficientAllowance(uint256 contractAllowance, uint256 amountBet);
 
     modifier isCreateable() {
         if (
@@ -153,7 +153,10 @@ contract TwoSlotsOption is Ownable {
 
     modifier isSufficientAllowance(uint256 _amountToBet) {
         if (IERC20(TOKEN0).allowance(msg.sender, address(this)) < _amountToBet) {
-            revert InsufficientAllowance();
+            revert InsufficientAllowance({
+                contractAllowance: IERC20(TOKEN0).allowance(msg.sender, address(this)),
+                amountBet: _amountToBet
+            });
         }
         _;
     }
