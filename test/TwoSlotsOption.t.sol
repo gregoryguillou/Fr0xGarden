@@ -2,6 +2,8 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {ContestStatus, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
@@ -11,10 +13,11 @@ contract TwoSlotsOptionTest is Test {
     address FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984; // address of UNISWAP V3 FACTORY on Arbitrum network.
     address TOKEN0 = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8; // USDC on Arbitrum network
     address TOKEN1 = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // WETH on Arbitrum network
-    uint256 public constant FIVE_USDC = 5e6; // 5 dollars in USDC  exponential notation of 6 decimals
-    uint256 public constant TEN_THOUSAND_USDC = 1e10; // 10000 dollars in USDC  exponential notation of 6 decimals
+    uint256 public constant FIVE_USDC = 5 * 1e6; // 5 dollars in USDC  exponential notation of 6 decimals
+    uint256 public constant TEN_THOUSAND_USDC = 10_000 * 1e6; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint24 UNISWAP_POOL_FEE = 3000;
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
+    address alice = makeAddr("alice");
 
     function setUp() public {
         string memory ARBITRUM_RPC_URL = vm.envString("ARBITRUM_RPC_URL");
@@ -78,7 +81,6 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test_CreateContest_CheckContestCreator() public {
-        address alice = makeAddr("alice");
         vm.prank(alice);
         twoSlotsOption.createContest();
         emit log_named_address("Creator", alice);
@@ -119,7 +121,7 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test_Bet_FuzzRevertIfAmountBetIsLessThanOfMinBet(uint256 _amountToBet) public {
-        _amountToBet = bound(_amountToBet, 0, 4_999_999);
+        _amountToBet = bound(_amountToBet, 0, FIVE_USDC - 1);
         _amountToBet = bound(_amountToBet, 10_000_000_001, 1e18);
         twoSlotsOption.createContest();
         uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
@@ -135,7 +137,7 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test_Bet_FuzzRevertIfAmountBetIsMoreThanOfMaxBet(uint256 _amountToBet) public {
-        _amountToBet = bound(_amountToBet, 10_000_000_001, 1e18);
+        _amountToBet = bound(_amountToBet, TEN_THOUSAND_USDC + 1, 1e18);
         twoSlotsOption.createContest();
         uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.expectRevert(
@@ -147,5 +149,17 @@ contract TwoSlotsOptionTest is Test {
             )
         );
         twoSlotsOption.bet(lastContestID, _amountToBet, true);
+    }
+
+    function test_Bet_FuzzRevertIfUserBalanceIsLessThanAmountToBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, TEN_THOUSAND_USDC - 1);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        deal(TOKEN0, alice, _amountToBet);
+        vm.expectRevert(
+            abi.encodeWithSelector(TwoSlotsOption.InsufficientBalance.selector, _amountToBet, TEN_THOUSAND_USDC)
+        );
+        vm.prank(alice);
+        twoSlotsOption.bet(lastContestID, TEN_THOUSAND_USDC, true);
     }
 }
