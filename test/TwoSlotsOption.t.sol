@@ -22,44 +22,44 @@ contract TwoSlotsOptionTest is Test {
         new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, 0.001 ether, 10 ether, 10 minutes);
     }
 
-    function getFeeByAmount_FuzzTestCalculations(uint96 _amount) public {
+    function test_getFeeByAmount_FuzzTestCalculations(uint96 _amount) public {
         vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= twoSlotsOption.MAX_BET());
         uint256 expected = _amount * twoSlotsOption.FEE_NUMERATOR() / twoSlotsOption.FEE_DENOMINATOR();
         emit log_named_uint("Amount Expected: ", expected);
         assertEq(twoSlotsOption.getFeeByAmount(_amount), expected);
     }
 
-    function createContest_CheckIfNewContestCreated() public {
+    function test_CreateContest_CheckIfNewContestCreated() public {
         uint256 expected = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         twoSlotsOption.createContest();
         assertLt(expected, twoSlotsOption.LAST_OPEN_CONTEST_ID());
     }
 
-    function createContest_CheckContestStatus() public {
+    function test_CreateContest_CheckContestStatus() public {
         twoSlotsOption.createContest();
         assertTrue(ContestStatus.OPEN == twoSlotsOption.getContestStatus(1));
     }
 
-    function createContest_CheckWinningSlot() public {
+    function test_CreateContest_CheckWinningSlot() public {
         twoSlotsOption.createContest();
         assertTrue(WinningSlot.UNDEFINED == twoSlotsOption.getContestWinningSlot(1));
     }
 
-    function createContest_CheckIfNewContestGetStartPrice() public {
+    function test_CreateContest_CheckIfNewContestGetStartPrice() public {
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestStartingPrice(1);
         emit log_named_uint("Starting Price", price);
         assertGe(price, 0);
     }
 
-    function createContest_CheckNewContestMaturityPrice() public {
+    function test_CreateContest_CheckNewContestMaturityPrice() public {
         twoSlotsOption.createContest();
         uint256 price = twoSlotsOption.getContestMaturityPrice(1);
         emit log_named_uint("Maturity Price", price);
         assertEq(price, 0);
     }
 
-    function createContest_CheckNewContestCloseAtTimeStamp() public {
+    function test_CreateContest_CheckNewContestCloseAtTimeStamp() public {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
         uint256 expectedCloseAtTimestamp = FIRST_MAY_2023 + 10 minutes;
@@ -67,7 +67,7 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedCloseAtTimestamp, twoSlotsOption.getContestCloseAtTimestamp(1));
     }
 
-    function createContest_CheckNewContestMaturityAtTimeStamp() public {
+    function test_CreateContest_CheckNewContestMaturityAtTimeStamp() public {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
         uint256 expectedMaturityAtTimestamp = FIRST_MAY_2023 + 20 minutes;
@@ -75,7 +75,7 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
     }
 
-    function createContest_CheckContestCreator() public {
+    function test_CreateContest_CheckContestCreator() public {
         address alice = makeAddr("alice");
         vm.prank(alice);
         twoSlotsOption.createContest();
@@ -90,15 +90,24 @@ contract TwoSlotsOptionTest is Test {
         assertEq(expectedResolver, twoSlotsOption.getContestResolver(1));
     }
 
-    function createContest_RevertIfContestIsAlreadyOpen() public {
+    function test_CreateContest_RevertIfContestIsAlreadyOpen() public {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
-        vm.expectRevert(
-            abi.encodeWithSelector(TwoSlotsOption.ContestIsAlreadyOpen.selector, twoSlotsOption.LAST_OPEN_CONTEST_ID())
-        );
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.warp(FIRST_MAY_2023 + 9 minutes);
+        vm.expectRevert(abi.encodeWithSelector(TwoSlotsOption.ContestIsAlreadyOpen.selector, lastContestID));
         twoSlotsOption.createContest();
     }
 
-    //function bet_RevertIfContestIsNotOpenToBet() public {}
+    function test_Bet_RevertIfContestNotInBettingPeriod() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        vm.warp(FIRST_MAY_2023 + 11 minutes);
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        uint256 lastContestCloseAt = twoSlotsOption.getContestCloseAtTimestamp(lastContestID);
+        vm.expectRevert(
+            abi.encodeWithSelector(TwoSlotsOption.BettingPeriodExpired.selector, block.timestamp, lastContestCloseAt)
+        );
+        twoSlotsOption.bet(lastContestID, 100, true);
+    }
 }

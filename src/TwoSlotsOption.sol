@@ -106,8 +106,9 @@ contract TwoSlotsOption is Ownable {
         Slot slotMore;
     }
 
-    error ContestIsAlreadyOpen(uint256 LAST_OPEN_CONTEST_ID);
-    error ContestNotOpenToBets();
+    error ContestIsAlreadyOpen(uint256 lastOpenContestID);
+    error ContestNotOpen();
+    error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
     error InsufficientBalance();
     error InsufficientAllowance();
 
@@ -116,15 +117,21 @@ contract TwoSlotsOption is Ownable {
             contests[LAST_OPEN_CONTEST_ID].contestStatus == ContestStatus.OPEN
                 && block.timestamp < contests[LAST_OPEN_CONTEST_ID].closeAt
         ) {
-            revert ContestIsAlreadyOpen(LAST_OPEN_CONTEST_ID);
+            revert ContestIsAlreadyOpen({lastOpenContestID: LAST_OPEN_CONTEST_ID});
         }
         _;
     }
 
-    modifier isContestOpenToBet(uint256 _contestID) {
-        if (contests[_contestID].contestStatus != ContestStatus.OPEN || block.timestamp > contests[_contestID].closeAt)
-        {
-            revert ContestNotOpenToBets();
+    modifier isContestInBettingPeriod(uint256 _contestID) {
+        if (block.timestamp >= contests[_contestID].closeAt) {
+            revert BettingPeriodExpired({actualTimestamp: block.timestamp, closeAt: contests[_contestID].closeAt});
+        }
+        _;
+    }
+
+    modifier isContestOpen(uint256 _contestID) {
+        if (contests[_contestID].contestStatus != ContestStatus.OPEN) {
+            revert ContestNotOpen();
         }
         _;
     }
@@ -205,11 +212,14 @@ contract TwoSlotsOption is Ownable {
 
     function bet(uint256 _contestID, uint256 _amountToBet, bool _isSlotMore)
         external
-        isContestOpenToBet(_contestID)
+        isContestInBettingPeriod(_contestID)
+        isContestOpen(_contestID)
         isSufficientBalance(_amountToBet)
         isSufficientAllowance(_amountToBet)
         returns (bool)
     {
+        //TODO : Create function to change contest Status from Open to resolved of Refundable
+        //TODO : CHECK And Revert if _amountToBet is under the minium Bet and above max Bet
         uint256 amountInSlotMoreBeforeBet = contests[_contestID].slotMore.totalAmount;
         uint256 amountInSlotLessBeforeBet = contests[_contestID].slotLess.totalAmount;
 
