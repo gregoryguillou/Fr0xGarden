@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ContestStatus, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
+import {ContestStatus, SlotType, WinningSlot, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
     using SafeERC20 for IERC20;
@@ -108,7 +108,7 @@ contract TwoSlotsOptionTest is Test {
 
     function test_Bet_RevertIfContestNotInOpenStatus() public {
         vm.expectRevert(TwoSlotsOption.ContestNotOpen.selector);
-        twoSlotsOption.bet(3, FIVE_USDC, true);
+        twoSlotsOption.bet(3, FIVE_USDC, SlotType.LESS);
     }
 
     function test_Bet_RevertIfContestNotInBettingPeriod() public {
@@ -120,7 +120,7 @@ contract TwoSlotsOptionTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.BettingPeriodExpired.selector, block.timestamp, lastContestCloseAt)
         );
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, true);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, SlotType.LESS);
     }
 
     function test_Bet_FuzzRevertIfAmountBetIsLessThanOfMinBet(uint256 _amountToBet) public {
@@ -136,7 +136,7 @@ contract TwoSlotsOptionTest is Test {
                 twoSlotsOption.MAX_BET()
             )
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, true);
+        twoSlotsOption.bet(lastContestID, _amountToBet, SlotType.LESS);
     }
 
     function test_Bet_FuzzRevertIfAmountBetIsMoreThanOfMaxBet(uint256 _amountToBet) public {
@@ -151,7 +151,7 @@ contract TwoSlotsOptionTest is Test {
                 twoSlotsOption.MAX_BET()
             )
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, true);
+        twoSlotsOption.bet(lastContestID, _amountToBet, SlotType.LESS);
     }
 
     function test_Bet_FuzzRevertIfUserBalanceIsLessThanAmountToBet(uint256 _amountToBet) public {
@@ -163,7 +163,7 @@ contract TwoSlotsOptionTest is Test {
             abi.encodeWithSelector(TwoSlotsOption.InsufficientBalance.selector, _amountToBet, TEN_THOUSAND_USDC)
         );
         vm.prank(alice);
-        twoSlotsOption.bet(lastContestID, TEN_THOUSAND_USDC, true);
+        twoSlotsOption.bet(lastContestID, TEN_THOUSAND_USDC, SlotType.LESS);
     }
 
     function test_Bet_FuzzRevertIfUserAllowanceIsLessThanAmountToBet(uint256 _amountToBet) public {
@@ -179,6 +179,6 @@ contract TwoSlotsOptionTest is Test {
             abi.encodeWithSelector(TwoSlotsOption.InsufficientAllowance.selector, contractAllowance, _amountToBet)
         );
         vm.prank(alice);
-        twoSlotsOption.bet(lastContestID, _amountToBet, true);
+        twoSlotsOption.bet(lastContestID, _amountToBet, SlotType.LESS);
     }
 }

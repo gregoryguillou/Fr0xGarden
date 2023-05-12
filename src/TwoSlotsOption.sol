@@ -21,6 +21,11 @@ enum ContestStatus {
     REFUNDABLE
 }
 
+enum SlotType {
+    LESS,
+    MORE
+}
+
 enum WinningSlot {
     UNDEFINED,
     LESS,
@@ -162,7 +167,7 @@ contract TwoSlotsOption is Ownable {
     }
 
     event CreateContest(uint256 indexed _contestID, address indexed _creator);
-    event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, bool _isSlotMore);
+    event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, SlotType _isSlotMore);
 
     /// @notice Calculate fees to be deducted from a given amount
     /// @dev Fee amount by dividing the numerator by the denominator which - e.g: 3/100 = 0.03 or 3% percent;
@@ -208,6 +213,10 @@ contract TwoSlotsOption is Ownable {
         return contests[_contestID].resolver;
     }
 
+    function getChosenSlot(SlotType _slotType, uint256 _contestID) internal view returns (Slot storage) {
+        return _slotType == SlotType.LESS ? contests[_contestID].slotLess : contests[_contestID].slotMore;
+    }
+
     function createContest() external isCreateable returns (bool) {
         uint256 newContestID = LAST_OPEN_CONTEST_ID + 1;
         contests[newContestID].contestStatus = ContestStatus.OPEN;
@@ -221,7 +230,7 @@ contract TwoSlotsOption is Ownable {
         return true;
     }
 
-    function bet(uint256 _contestID, uint256 _amountToBet, bool _isSlotMore)
+    function bet(uint256 _contestID, uint256 _amountToBet, SlotType _slotType)
         external
         isContestOpen(_contestID)
         isContestInBettingPeriod(_contestID)
@@ -230,37 +239,12 @@ contract TwoSlotsOption is Ownable {
         isSufficientAllowance(_amountToBet)
         returns (bool)
     {
-        uint256 amountInSlotMoreBeforeBet = contests[_contestID].slotMore.totalAmount;
-        uint256 amountInSlotLessBeforeBet = contests[_contestID].slotLess.totalAmount;
-
-        if (_isSlotMore) {
-            bool isUserAlreadyBetInSlotMore =
-                contests[_contestID].slotMore.options[msg.sender].optionStatus == OptionStatus.CREATED;
-            contests[_contestID].slotMore.totalAmount = amountInSlotMoreBeforeBet + _amountToBet;
-
-            if (!isUserAlreadyBetInSlotMore) {
-                contests[_contestID].slotMore.options[msg.sender].optionStatus = OptionStatus.CREATED;
-                contests[_contestID].slotMore.options[msg.sender].amount = _amountToBet;
-            } else {
-                uint256 amountAlreadyBetByUserInSlotMore = contests[_contestID].slotMore.options[msg.sender].amount;
-                contests[_contestID].slotMore.options[msg.sender].amount =
-                    amountAlreadyBetByUserInSlotMore + _amountToBet;
-            }
-        } else {
-            bool isUserAlreadyBetInSlotLess =
-                contests[_contestID].slotLess.options[msg.sender].optionStatus == OptionStatus.CREATED;
-            contests[_contestID].slotLess.totalAmount = amountInSlotLessBeforeBet + _amountToBet;
-
-            if (!isUserAlreadyBetInSlotLess) {
-                contests[_contestID].slotLess.options[msg.sender].optionStatus = OptionStatus.CREATED;
-                contests[_contestID].slotLess.options[msg.sender].amount = _amountToBet;
-            } else {
-                uint256 amountAlreadyBetByUserInSlotLess = contests[_contestID].slotLess.options[msg.sender].amount;
-                contests[_contestID].slotLess.options[msg.sender].amount =
-                    amountAlreadyBetByUserInSlotLess + _amountToBet;
-            }
-        }
-        emit Bet(_contestID, msg.sender, _amountToBet, _isSlotMore);
+        Slot storage chosenSlot = getChosenSlot(_slotType, _contestID);
+        chosenSlot.totalAmount += _amountToBet;
+        bool isUserFirstBet = chosenSlot.options[msg.sender].optionStatus == OptionStatus.UNDEFINED;
+        if (isUserFirstBet) chosenSlot.options[msg.sender].optionStatus = OptionStatus.CREATED;
+        chosenSlot.options[msg.sender].amount += _amountToBet;
+        emit Bet(_contestID, msg.sender, _amountToBet, _slotType);
         return true;
     }
 }
