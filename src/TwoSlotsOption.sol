@@ -102,6 +102,11 @@ contract TwoSlotsOption is Ownable {
         mapping(address => Option) options;
     }
 
+    struct Odds {
+        uint256 slotLess;
+        uint256 slotMore;
+    }
+
     struct Contest {
         ContestStatus contestStatus; // Status of the current Contest
         uint256 startedAt; // Unix timestamp at contest creation
@@ -218,7 +223,7 @@ contract TwoSlotsOption is Ownable {
         return contests[_contestID].resolver;
     }
 
-    function getAmountBetInSlot(uint256 _contestID, SlotType _slotType) external view returns (uint256) {
+    function getAmountBetInSlot(uint256 _contestID, SlotType _slotType) public view returns (uint256) {
         return _slotType == SlotType.LESS
             ? contests[_contestID].slotLess.totalAmount
             : contests[_contestID].slotMore.totalAmount;
@@ -246,6 +251,15 @@ contract TwoSlotsOption is Ownable {
 
     function getChosenSlot(uint256 _contestID, SlotType _slotType) internal view returns (Slot storage) {
         return _slotType == SlotType.LESS ? contests[_contestID].slotLess : contests[_contestID].slotMore;
+    }
+
+    function getSlotOdds(uint256 _amountInSlotLess, uint256 _amountInSlotMore) public view returns (Odds memory) {
+        uint256 totalGrossBet = _amountInSlotLess.add(_amountInSlotMore);
+        uint256 fees = getFeeByAmount(totalGrossBet);
+        uint256 totalNetBet = totalGrossBet.sub(fees);
+
+        return Odds({slotLess: totalNetBet.div(_amountInSlotLess), slotMore: totalNetBet.div(_amountInSlotMore)});
+        //TODO:FIX fonction pour quelle retourne des nombre plus precis (a deux chiffre apres la virgule)
     }
 
     function createContest() external isCreateable returns (bool) {

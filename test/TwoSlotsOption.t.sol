@@ -19,7 +19,6 @@ contract TwoSlotsOptionTest is Test {
     uint256 public constant FIVE_USDC = 5 * 1e6; // 5 dollars in USDC  exponential notation of 6 decimals to assign MIN BET
     uint256 public constant TEN_THOUSAND_USDC = 10_000 * 1e6; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint256 public constant ONE_MILION_USDC = 1_000_000 * 1e6; // 1M dollars in USDC  exponential notation of 6 decimals, to assign MAX BET
-
     uint24 UNISWAP_POOL_FEE = 3000;
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
     address alice = makeAddr("alice");
@@ -32,11 +31,22 @@ contract TwoSlotsOptionTest is Test {
         new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, 6, 3, 100, FIVE_USDC,ONE_MILION_USDC, 10 minutes);
     }
 
-    function test_getFeeByAmount_FuzzTestCalculations(uint256 _amount) public {
+    function test_GetFeeByAmount_FuzzTestCalculations(uint256 _amount) public {
         vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= twoSlotsOption.MAX_BET());
         uint256 expected = _amount * twoSlotsOption.FEE_NUMERATOR() / twoSlotsOption.FEE_DENOMINATOR();
         emit log_named_uint("Amount Expected: ", expected);
         assertEq(twoSlotsOption.getFeeByAmount(_amount), expected);
+    }
+
+    function test_GetSlotOdds_TestCalculations() public {
+        uint256 _amountInSlotLess = 7865610;
+        uint256 _amountInSlotMore = 6765610;
+
+        uint256 oddForLess = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
+        emit log_named_uint("Odd For Less: ", oddForLess);
+        uint256 oddForMore = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
+        emit log_named_uint("Odd For More: ", oddForMore);
+        assertEq(oddForLess, oddForMore);
     }
 
     function test_CreateContest_CheckIfNewContestCreated() public {
