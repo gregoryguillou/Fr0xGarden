@@ -29,7 +29,7 @@ contract TwoSlotsOptionTest is Test {
         arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
         vm.selectFork(arbitrumFork);
         twoSlotsOption =
-        new TwoSlotsOption(FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, FEE_COLLECTOR, 3, 100, FIVE_USDC,ONE_MILION_USDC, 10 minutes);
+        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, 6, 3, 100, FIVE_USDC,ONE_MILION_USDC, 10 minutes);
     }
 
     function test_getFeeByAmount_FuzzTestCalculations(uint256 _amount) public {

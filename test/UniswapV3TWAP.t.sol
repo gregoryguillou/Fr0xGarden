@@ -20,7 +20,7 @@ contract UniswapV3TWAPTest is Test {
     function testEstimateAmountOut() public {
         vm.selectFork(mainnetFork);
         uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
-        uint256 price = uniswapV3TWAP.estimateAmountOut(TOKEN1, 10 ** 18, 32);
+        uint256 price = uniswapV3TWAP.estimateAmountOut(TOKEN1, 10 ** 18, 4);
         emit log_named_uint("price : ", price);
         assertGe(price, 0);
     }
