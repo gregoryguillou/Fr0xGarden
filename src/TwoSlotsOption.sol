@@ -54,7 +54,6 @@ contract TwoSlotsOption is Ownable {
     uint8 public SECONDS_FOR_ORACLE_TWAP; // fees of the desired Uniswap pool in order to use the V3 oracle features
     UniswapV3TWAP uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
-    uint256 public MAX_BET; // maximum amount to bet - to avoid overflow
     uint256 public MAX_BET_IN_SLOT; // maximum amount Bet in Slot to allow a precise redistribution of the gains
     uint8 public FEE_NUMERATOR; // numerator to calculate fees
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
@@ -73,9 +72,8 @@ contract TwoSlotsOption is Ownable {
         uint8 _FEE_NUMERATOR,
         uint8 _FEE_DENOMINATOR,
         uint256 _MIN_BET,
-        uint256 _MAX_BET,
         uint256 _MAX_BET_IN_SLOT,
-        uint64 _EPOCH
+        uint256 _EPOCH
     ) {
         FEES_COLLECTOR = _FEES_COLLECTOR;
         FACTORY = _FACTORY;
@@ -86,7 +84,6 @@ contract TwoSlotsOption is Ownable {
         FEE_NUMERATOR = _FEE_NUMERATOR;
         FEE_DENOMINATOR = _FEE_DENOMINATOR;
         MIN_BET = _MIN_BET;
-        MAX_BET = _MAX_BET;
         MAX_BET_IN_SLOT = _MAX_BET_IN_SLOT;
         EPOCH = _EPOCH;
         uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
@@ -130,10 +127,11 @@ contract TwoSlotsOption is Ownable {
     error ContestIsAlreadyOpen(uint256 lastOpenContestID);
     error ContestNotOpen();
     error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
-    error BetAmountOutOfRange(uint256 amountBet, uint256 minBet, uint256 maxBet);
+    error InsufficientBetAmount(uint256 amountBet, uint256 minBet);
     error InsufficientBalance(uint256 userBalance, uint256 amountBet);
     error InsufficientAllowance(uint256 contractAllowance, uint256 amountBet);
     error InsufficientAmountInSlots(uint256 amountInSlotLess, uint256 amountInSlotMore, uint256 minRequired);
+    error MaxAmountInSlotReached(uint256 amountBet, SlotType slot, uint256 maxBetRemaining);
 
     modifier isCreateable() {
         if (
@@ -159,9 +157,9 @@ contract TwoSlotsOption is Ownable {
         _;
     }
 
-    modifier isBetAmountInRange(uint256 _amountToBet) {
-        if (_amountToBet < MIN_BET || _amountToBet > MAX_BET) {
-            revert BetAmountOutOfRange({amountBet: _amountToBet, minBet: MIN_BET, maxBet: MAX_BET});
+    modifier isSufficientBetAmount(uint256 _amountToBet) {
+        if (_amountToBet < MIN_BET) {
+            revert InsufficientBetAmount({amountBet: _amountToBet, minBet: MIN_BET});
         }
         _;
     }
@@ -190,6 +188,14 @@ contract TwoSlotsOption is Ownable {
                 amountInSlotMore: _amountInSlotMore,
                 minRequired: MIN_BET
             });
+        }
+        _;
+    }
+
+    modifier isMaxAmountNotReached(uint256 _contestID, uint256 _amountToBet, SlotType _slotType) {
+        if (getAmountBetInSlot(_contestID, _slotType) + _amountToBet > MAX_BET_IN_SLOT) {
+            uint256 maxBetRemaining = MAX_BET_IN_SLOT - getAmountBetInSlot(_contestID, _slotType);
+            revert MaxAmountInSlotReached({amountBet: _amountToBet, slot: _slotType, maxBetRemaining: maxBetRemaining});
         }
         _;
     }
@@ -330,13 +336,12 @@ contract TwoSlotsOption is Ownable {
         external
         isContestOpen(_contestID)
         isContestInBettingPeriod(_contestID)
-        isBetAmountInRange(_amountToBet)
+        isSufficientBetAmount(_amountToBet)
         isSufficientBalance(_amountToBet)
         isSufficientAllowance(_amountToBet)
+        isMaxAmountNotReached(_contestID, _amountToBet, _slotType)
         returns (bool)
     {
-        //TODO: Add check to revert if max bet in slot is reached
-
         Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
         chosenSlot.totalAmount += _amountToBet;
         bool isUserFirstBet = getOptionStatus(_contestID, _slotType, msg.sender) == OptionStatus.UNDEFINED;
@@ -345,5 +350,6 @@ contract TwoSlotsOption is Ownable {
         emit Bet(_contestID, msg.sender, _amountToBet, _slotType);
         return true;
     }
-    // TODO: Handle refund if odd is less than 1 because fees;
+
+    // TODO: Handle refund if odd is less than 1.03 because User can loose money even if i beton the good output;
 }
