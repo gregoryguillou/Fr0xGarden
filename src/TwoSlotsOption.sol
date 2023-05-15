@@ -347,6 +347,9 @@ contract TwoSlotsOption is Ownable {
         bool isUserFirstBet = getOptionStatus(_contestID, _slotType, msg.sender) == OptionStatus.UNDEFINED;
         if (isUserFirstBet) chosenSlot.options[msg.sender].optionStatus = OptionStatus.CREATED;
         chosenSlot.options[msg.sender].amount += _amountToBet;
+        IERC20(TOKEN0).safeTransferFrom(msg.sender, address(this), _amountToBet);
+        //TODO: test que le transfert a fonctionner
+        //TODO: demande a GPT si la fonction est safe
         emit Bet(_contestID, msg.sender, _amountToBet, _slotType);
         return true;
     }

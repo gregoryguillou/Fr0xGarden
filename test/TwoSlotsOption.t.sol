@@ -314,4 +314,33 @@ contract TwoSlotsOptionTest is Test {
         uint256 TEN_USDC = 10 * 1e6;
         assertEq(expectedAmountInOption, TEN_USDC);
     }
+
+    function test_Bet_FuzzCheckIfUSDCBalancesChangeWithBet(uint256 _amountBet) public {
+        _amountBet = bound(_amountBet, FIVE_USDC, ONE_MILION_USDC);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, _amountBet);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountBet);
+        uint256 userBalanceBeforeBet = IERC20(TOKEN0).balanceOf(msg.sender);
+        emit log_named_uint("User Balance Before Bet", userBalanceBeforeBet);
+        assertGt(userBalanceBeforeBet, 0);
+        twoSlotsOption.bet(lastContestID, _amountBet, SlotType.LESS);
+        uint256 userBalanceAfterBet = IERC20(TOKEN0).balanceOf(msg.sender);
+        emit log_named_uint("User Balance After Bet", userBalanceAfterBet);
+        assertEq(userBalanceAfterBet, 0);
+        uint256 contractBalanceAfterUserBet = IERC20(TOKEN0).balanceOf(address(twoSlotsOption));
+        emit log_named_uint("Contract Balance After User Bet", contractBalanceAfterUserBet);
+        assertEq(contractBalanceAfterUserBet, userBalanceBeforeBet);
+    }
+
+    function test_GetHumanReadeableSlotOdds() public {
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, ONE_MILION_USDC);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
+        twoSlotsOption.bet(lastContestID, 13_000 * 1e6, SlotType.LESS);
+        twoSlotsOption.bet(lastContestID, 41_000 * 1e6, SlotType.MORE);
+    }
 }
