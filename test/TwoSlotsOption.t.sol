@@ -19,8 +19,11 @@ contract TwoSlotsOptionTest is Test {
     uint256 public constant FIVE_USDC = 5 * 1e6; // 5 dollars in USDC  exponential notation of 6 decimals to assign MIN BET
     uint256 public constant TEN_THOUSAND_USDC = 10_000 * 1e6; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint256 public constant ONE_MILION_USDC = 1_000_000 * 1e6; // 1M dollars in USDC  exponential notation of 6 decimals, to assign MAX BET
+    uint256 public constant HUNDRED_MILION_USDC = 100_000_000 * 1e6; // 1M dollars in USDC  exponential notation of 6 decimals, to assign MAX BET
+    uint256 public constant MAX_BET_IN_SLOT = 1 * 1e12;
     uint24 UNISWAP_POOL_FEE = 3000;
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
+    uint8 public SECONDS_FOR_ORACLE_TWAP = 6;
     address alice = makeAddr("alice");
 
     function setUp() public {
@@ -28,7 +31,7 @@ contract TwoSlotsOptionTest is Test {
         arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
         vm.selectFork(arbitrumFork);
         twoSlotsOption =
-        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, 6, 3, 100, FIVE_USDC,ONE_MILION_USDC, 10 minutes);
+        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, 6, 3, 100, FIVE_USDC,ONE_MILION_USDC,MAX_BET_IN_SLOT, 10 minutes);
     }
 
     function test_GetFeeByAmount_FuzzTestCalculations(uint256 _amount) public {
@@ -38,15 +41,84 @@ contract TwoSlotsOptionTest is Test {
         assertEq(twoSlotsOption.getFeeByAmount(_amount), expected);
     }
 
-    function test_GetSlotOdds_TestCalculations() public {
-        uint256 _amountInSlotLess = 7865610;
-        uint256 _amountInSlotMore = 6765610;
+    function test_GetSlotOdds_RevertIfInsufficientAmountInSlots(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
+        public
+    {
+        vm.assume(_amountInSlotLess < twoSlotsOption.MIN_BET() || _amountInSlotMore < twoSlotsOption.MIN_BET());
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TwoSlotsOption.InsufficientAmountInSlots.selector,
+                _amountInSlotLess,
+                _amountInSlotMore,
+                twoSlotsOption.MIN_BET()
+            )
+        );
+        twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore);
+    }
 
-        uint256 oddForLess = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
-        emit log_named_uint("Odd For Less: ", oddForLess);
-        uint256 oddForMore = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
-        emit log_named_uint("Odd For More: ", oddForMore);
-        assertEq(oddForLess, oddForMore);
+    function test_GetSlotOdds_CheckIfLessHaveBiggerOddWhenLessMoneyInSlot(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC, ONE_MILION_USDC - 1);
+        _amountInSlotMore = bound(_amountInSlotMore, ONE_MILION_USDC, HUNDRED_MILION_USDC);
+
+        emit log_named_uint("Amount In Slot Less", _amountInSlotLess);
+        emit log_named_uint("Amount In Slot More", _amountInSlotMore);
+
+        uint256 oddLess = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
+        emit log_named_uint("Odd Less", oddLess);
+
+        uint256 oddMore = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
+        emit log_named_uint("Odd More", oddMore);
+
+        assertGt(oddLess, oddMore);
+    }
+
+    function test_GetSlotOdds_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, TEN_THOUSAND_USDC);
+        _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC + 1, ONE_MILION_USDC);
+        emit log_named_uint("Amount In Slot More: ", _amountInSlotMore);
+        emit log_named_uint("Amount In Slot Less: ", _amountInSlotLess);
+
+        uint256 oddMore = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
+        emit log_named_uint("Odd More", oddMore);
+        uint256 oddLess = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
+        emit log_named_uint("Odd Less", oddLess);
+
+        assertGt(oddMore, oddLess);
+    }
+
+    function test_GetAmountRemainsInSlots_CheckIfLessThanOnePenny(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
+        public
+    {
+        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
+
+        emit log_named_uint("Amount In Slot Less", _amountInSlotLess);
+        emit log_named_uint("Amount In Slot More", _amountInSlotMore);
+        uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
+        uint256 fees = twoSlotsOption.getFeeByAmount(totalGrossBet);
+        uint256 totalNetToShareBetweenWinners = totalGrossBet - fees;
+        emit log_named_uint("Total Net To Share Between Winners", totalNetToShareBetweenWinners);
+
+        uint256 remainingInSlotLess = twoSlotsOption.getAmountRemainsInSlots(
+            totalNetToShareBetweenWinners, _amountInSlotLess, _amountInSlotMore
+        ).slotLess;
+        emit log_named_uint("Remaining In Slot Less", remainingInSlotLess);
+
+        uint256 remainingInSlotMore = twoSlotsOption.getAmountRemainsInSlots(
+            totalNetToShareBetweenWinners, _amountInSlotLess, _amountInSlotMore
+        ).slotMore;
+        emit log_named_uint("Remaining In Slot More", remainingInSlotMore);
+
+        uint256 ONE_PENNY_USDC = 1 * 1e3;
+
+        assertLt(remainingInSlotLess, ONE_PENNY_USDC);
+        assertLt(remainingInSlotMore, ONE_PENNY_USDC);
     }
 
     function test_CreateContest_CheckIfNewContestCreated() public {
