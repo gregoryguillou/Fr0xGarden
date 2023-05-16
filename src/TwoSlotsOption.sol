@@ -13,6 +13,7 @@ import {UniswapV3TWAP} from "src/UniswapV3TWAP.sol";
 /// @notice Mutual Slots implementation of Two Slots Option contract.
 
 // TODO: Handle refund if odd is less than 1.03 because User can loose money even if he bet on the good output;
+// TODO: cut test il specifics files to refacto;
 
 /// @notice Status of a Contest. The status can alternate between 3 different states.
 // OPEN is the default status when a new Contest is created. In this status, if the contest is not mature, users can buy a slot option.
@@ -47,6 +48,18 @@ enum OptionStatus {
     REFUND
 }
 
+struct SlotFinancialData {
+    uint256 totalGrossBet;
+    uint256 fees;
+    uint256 netToShareBetweenWinners;
+    uint256 oddLess;
+    uint256 readableOddLess;
+    string decimalsOddLess;
+    uint256 oddMore;
+    uint256 readableOddMore;
+    string decimalsOddMore;
+}
+
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
     using Strings for uint256;
@@ -65,7 +78,6 @@ contract TwoSlotsOption is Ownable {
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
-    uint256 public lastCloseContestID; // ID of last contest close. To be close a contest need to be Resolved or Refundable
     mapping(uint256 => Contest) contests; // mapping of all contests formatted as struct.
 
     constructor(
@@ -285,29 +297,32 @@ contract TwoSlotsOption is Ownable {
         return _slotType == SlotType.LESS ? contests[_contestID].slotLess : contests[_contestID].slotMore;
     }
 
-    function numToFixedLengthStr(uint256 decimalPlaces, uint256 num) internal pure returns (string memory) {
+    function numToFixedLengthStr(uint256 _decimalPlaces, uint256 _num) internal pure returns (string memory) {
+        //TODO: Rewrite with better naming
         bytes memory byteString;
-        for (uint256 i = 0; i < decimalPlaces; i++) {
-            uint256 remainder = num % 10;
+        for (uint256 i = 0; i < _decimalPlaces; i++) {
+            uint256 remainder = _num % 10;
             byteString = abi.encodePacked(remainder.toString(), byteString);
-            num = num / 10;
+            _num = _num / 10;
         }
         return string(byteString);
     }
 
-    function getDecimalsStringFromReadableOdd(uint256 decimalPlaces, uint256 numerator, uint256 denominator)
+    function getDecimalsStringFromReadableOdd(uint256 _decimalPlaces, uint256 _numerator, uint256 _denominator)
         public
         pure
         returns (string memory)
     {
-        uint256 factor = 10 ** decimalPlaces;
-        uint256 quotient = numerator / denominator;
-        bool rounding = 2 * ((numerator * factor) % denominator) >= denominator;
-        uint256 remainder = (numerator * factor / denominator) % factor;
+        //TODO: Rewrite with better naming
+
+        uint256 factor = 10 ** _decimalPlaces;
+        uint256 quotient = _numerator / _denominator;
+        bool rounding = 2 * ((_numerator * factor) % _denominator) >= _denominator;
+        uint256 remainder = (_numerator * factor / _denominator) % factor;
         if (rounding) {
             remainder += 1;
         }
-        return string(abi.encodePacked(quotient.toString(), ".", numToFixedLengthStr(decimalPlaces, remainder)));
+        return string(abi.encodePacked(quotient.toString(), ".", numToFixedLengthStr(_decimalPlaces, remainder)));
     }
 
     function getSlotOdds(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
@@ -324,35 +339,32 @@ contract TwoSlotsOption is Ownable {
         return Odds({slotLess: oddForLess, slotMore: oddForMore});
     }
 
-    /*
-    function getHumanReadeableSlotOdds(uint256 _oddForLess, uint256 _oddForMore)
+    function getSlotFinancialData(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
         public
         view
-        returns (HumanReadeableOdds memory)
+        isSufficientAmountInSlots(_amountInSlotLess, _amountInSlotMore)
+        returns (SlotFinancialData memory)
     {
-        return
-            HumanReadeableOdds({slotLess: totalNetBet / _amountInSlotLess, slotMore: totalNetBet / _amountInSlotMore});
-        //TODO:FIX fonction pour quelle retourne des nombre plus precis (a deux chiffre apres la virgule)
-    }
-    */
+        uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
+        uint256 fees = getFeeByAmount(totalGrossBet);
+        uint256 netToShareBetweenWinners = totalGrossBet - fees;
+        uint256 oddLess = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotLess;
+        uint256 readableOddLess = oddLess / (PRECISION_FACTOR / 1e3); // To get number on Base 1000
+        string memory decimalsOddLess = getDecimalsStringFromReadableOdd(3, readableOddLess, 1000);
+        uint256 oddMore = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotMore;
+        uint256 readableOddMore = oddMore / (PRECISION_FACTOR / 1e3); // To get number on Base 1000
+        string memory decimalsOddMore = getDecimalsStringFromReadableOdd(3, readableOddMore, 1000);
 
-    function getAmountRemainsInSlots(
-        uint256 totalNetToShareBetweenWinners,
-        uint256 _amountInSlotLess,
-        uint256 _amountInSlotMore
-    ) public view returns (AmountRemainsInSlot memory) {
-        uint256 oddLess = getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
-        uint256 oddMore = getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
-
-        uint256 amountRedisitributedIfLessWin = (_amountInSlotLess * oddLess) / PRECISION_FACTOR;
-        uint256 amountRemainingInThePoolIfLessWin = totalNetToShareBetweenWinners - amountRedisitributedIfLessWin;
-
-        uint256 amountRedisitributedIfMoreWin = (_amountInSlotMore * oddMore) / PRECISION_FACTOR;
-        uint256 amountRemainingInThePoolIfMoreWin = totalNetToShareBetweenWinners - amountRedisitributedIfMoreWin;
-
-        return AmountRemainsInSlot({
-            slotLess: amountRemainingInThePoolIfLessWin,
-            slotMore: amountRemainingInThePoolIfMoreWin
+        return SlotFinancialData({
+            totalGrossBet: totalGrossBet,
+            fees: fees,
+            netToShareBetweenWinners: netToShareBetweenWinners,
+            oddLess: oddLess,
+            readableOddLess: readableOddLess,
+            decimalsOddLess: decimalsOddLess,
+            oddMore: oddMore,
+            readableOddMore: readableOddMore,
+            decimalsOddMore: decimalsOddMore
         });
     }
 
