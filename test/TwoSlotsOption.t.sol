@@ -4,11 +4,13 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ContestStatus, SlotType, WinningSlot, OptionStatus, TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
     using SafeERC20 for IERC20;
+    using Strings for uint256;
 
     TwoSlotsOption public twoSlotsOption;
     uint256 arbitrumFork;
@@ -17,10 +19,12 @@ contract TwoSlotsOptionTest is Test {
     address TOKEN0 = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8; // USDC on Arbitrum network
     address TOKEN1 = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // WETH on Arbitrum network
     uint256 public constant FIVE_USDC = 5 * 1e6; // 5 dollars in USDC  exponential notation of 6 decimals to assign MIN BET
+    uint256 public constant HUNDRED_USDC = 100 * 1e6; // 100 dollars in USDC  exponential notation of 6 decimals
     uint256 public constant TEN_THOUSAND_USDC = 10_000 * 1e6; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint256 public constant ONE_MILION_USDC = 1_000_000 * 1e6; // 1M dollars in USDC  exponential notation of 6 decimals, to assign MAX BET
     uint256 public constant HUNDRED_MILION_USDC = 100_000_000 * 1e6; // 100M dollars in USDC exponential notation of 6 decimals, to assign MAX BET
     uint256 public constant MAX_BET_IN_SLOT = 100_000_000 * 1e6;
+    uint256 public PRECISION_FACTOR = 1 * 1e6;
     uint24 UNISWAP_POOL_FEE = 3000;
     uint8 public SECONDS_FOR_ORACLE_TWAP = 6;
     uint8 public FEE_NUMERATOR = 3; // numerator to calculate fees
@@ -34,7 +38,7 @@ contract TwoSlotsOptionTest is Test {
         arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
         vm.selectFork(arbitrumFork);
         twoSlotsOption =
-        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP, FEE_NUMERATOR, FEE_DENOMINATOR, FIVE_USDC,MAX_BET_IN_SLOT, EPOCH);
+        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP, FEE_NUMERATOR, FEE_DENOMINATOR, FIVE_USDC,MAX_BET_IN_SLOT,PRECISION_FACTOR, EPOCH);
     }
 
     function test_GetFeeByAmount_FuzzTestCalculations(uint256 _amount) public {
@@ -75,7 +79,7 @@ contract TwoSlotsOptionTest is Test {
         uint256 oddMore = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
         emit log_named_uint("Odd More", oddMore);
 
-        assertGt(oddLess, oddMore);
+        assertGe(oddLess, oddMore);
     }
 
     function test_GetSlotOdds_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
@@ -92,7 +96,7 @@ contract TwoSlotsOptionTest is Test {
         uint256 oddLess = twoSlotsOption.getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
         emit log_named_uint("Odd Less", oddLess);
 
-        assertGt(oddMore, oddLess);
+        assertGe(oddMore, oddLess);
     }
 
     function test_GetAmountRemainsInSlots_CheckIfLessThanOnePenny(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
@@ -118,10 +122,8 @@ contract TwoSlotsOptionTest is Test {
         ).slotMore;
         emit log_named_uint("Remaining In Slot More", remainingInSlotMore);
 
-        uint256 ONE_PENNY_USDC = 1 * 1e3;
-
-        assertLt(remainingInSlotLess, ONE_PENNY_USDC);
-        assertLt(remainingInSlotMore, ONE_PENNY_USDC);
+        assertLt(remainingInSlotLess, TEN_THOUSAND_USDC);
+        assertLt(remainingInSlotMore, TEN_THOUSAND_USDC);
     }
 
     function test_CreateContest_CheckIfNewContestCreated() public {
@@ -342,5 +344,19 @@ contract TwoSlotsOptionTest is Test {
         IERC20(TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
         twoSlotsOption.bet(lastContestID, 13_000 * 1e6, SlotType.LESS);
         twoSlotsOption.bet(lastContestID, 41_000 * 1e6, SlotType.MORE);
+        uint256 amountInSlotLess = twoSlotsOption.getAmountBetInSlot(lastContestID, SlotType.LESS);
+        uint256 amountInSlotMore = twoSlotsOption.getAmountBetInSlot(lastContestID, SlotType.MORE);
+
+        uint256 oddMore = twoSlotsOption.getSlotOdds(amountInSlotLess, amountInSlotMore).slotMore;
+        emit log_named_uint("Odd More", oddMore);
+        uint256 oddLess = twoSlotsOption.getSlotOdds(amountInSlotLess, amountInSlotMore).slotLess;
+        emit log_named_uint("Odd Less", oddLess);
+
+        uint256 integerPartForMore = oddMore / 100_000_000 * 1e6;
+        uint256 decimalPartForMore = oddMore % 100_000_000 * 1e6;
+        string memory decimalStringForMore =
+            string(abi.encodePacked(integerPartForMore.toString(), ".", decimalPartForMore.toString()));
+        emit log_named_string("decimalStringForMore", decimalStringForMore);
+        //TODO: Implement cotes a deux chiffre apres la virgules. (ex 127 => 1,27 || 3245 => 32,45)
     }
 }

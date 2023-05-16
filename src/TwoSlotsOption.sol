@@ -10,6 +10,8 @@ import {UniswapV3TWAP} from "src/UniswapV3TWAP.sol";
 /// @author @fr0xMaster
 /// @notice Mutual Slots implementation of Two Slots Option contract.
 
+// TODO: Handle refund if odd is less than 1.03 because User can loose money even if he bet on the good output;
+
 /// @notice Status of a Contest. The status can alternate between 3 different states.
 // OPEN is the default status when a new Contest is created. In this status, if the contest is not mature, users can buy a slot option.
 // RESOLVED is the status assigned once the Contest has reached maturity and a winning slot has been determined in favor of a loser.
@@ -55,6 +57,7 @@ contract TwoSlotsOption is Ownable {
     UniswapV3TWAP uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
     uint256 public MAX_BET_IN_SLOT; // maximum amount Bet in Slot to allow a precise redistribution of the gains
+    uint256 public PRECISION_FACTOR; // used to allow for better accuracy of odds and redistribution of winnings
     uint8 public FEE_NUMERATOR; // numerator to calculate fees
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
     uint256 public EPOCH; // duration of an epoch expressed in seconds
@@ -73,6 +76,7 @@ contract TwoSlotsOption is Ownable {
         uint8 _FEE_DENOMINATOR,
         uint256 _MIN_BET,
         uint256 _MAX_BET_IN_SLOT,
+        uint256 _PRECISION_FACTOR,
         uint256 _EPOCH
     ) {
         FEES_COLLECTOR = _FEES_COLLECTOR;
@@ -85,6 +89,7 @@ contract TwoSlotsOption is Ownable {
         FEE_DENOMINATOR = _FEE_DENOMINATOR;
         MIN_BET = _MIN_BET;
         MAX_BET_IN_SLOT = _MAX_BET_IN_SLOT;
+        PRECISION_FACTOR = _PRECISION_FACTOR;
         EPOCH = _EPOCH;
         uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
     }
@@ -286,9 +291,8 @@ contract TwoSlotsOption is Ownable {
         uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
         uint256 fees = getFeeByAmount(totalGrossBet);
         uint256 totalNetToShareBetweenWinners = totalGrossBet - fees;
-        uint256 precisionForGetOddAccurate = MAX_BET_IN_SLOT;
-        uint256 oddForLess = totalNetToShareBetweenWinners * precisionForGetOddAccurate / _amountInSlotLess;
-        uint256 oddForMore = totalNetToShareBetweenWinners * precisionForGetOddAccurate / _amountInSlotMore;
+        uint256 oddForLess = totalNetToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotLess;
+        uint256 oddForMore = totalNetToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotMore;
         return Odds({slotLess: oddForLess, slotMore: oddForMore});
     }
 
@@ -303,14 +307,13 @@ contract TwoSlotsOption is Ownable {
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public view returns (AmountRemainsInSlot memory) {
-        uint256 precisionForGetOddAccurate = MAX_BET_IN_SLOT;
         uint256 oddLess = getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotLess;
         uint256 oddMore = getSlotOdds(_amountInSlotLess, _amountInSlotMore).slotMore;
 
-        uint256 amountRedisitributedIfLessWin = (_amountInSlotLess * oddLess) / precisionForGetOddAccurate;
+        uint256 amountRedisitributedIfLessWin = (_amountInSlotLess * oddLess) / PRECISION_FACTOR;
         uint256 amountRemainingInThePoolIfLessWin = totalNetToShareBetweenWinners - amountRedisitributedIfLessWin;
 
-        uint256 amountRedisitributedIfMoreWin = (_amountInSlotMore * oddMore) / precisionForGetOddAccurate;
+        uint256 amountRedisitributedIfMoreWin = (_amountInSlotMore * oddMore) / PRECISION_FACTOR;
         uint256 amountRemainingInThePoolIfMoreWin = totalNetToShareBetweenWinners - amountRedisitributedIfMoreWin;
 
         return AmountRemainsInSlot({
@@ -348,11 +351,7 @@ contract TwoSlotsOption is Ownable {
         if (isUserFirstBet) chosenSlot.options[msg.sender].optionStatus = OptionStatus.CREATED;
         chosenSlot.options[msg.sender].amount += _amountToBet;
         IERC20(TOKEN0).safeTransferFrom(msg.sender, address(this), _amountToBet);
-        //TODO: test que le transfert a fonctionner
-        //TODO: demande a GPT si la fonction est safe
         emit Bet(_contestID, msg.sender, _amountToBet, _slotType);
         return true;
     }
-
-    // TODO: Handle refund if odd is less than 1.03 because User can loose money even if i beton the good output;
 }
