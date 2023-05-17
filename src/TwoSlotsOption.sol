@@ -4,14 +4,13 @@ pragma solidity ^0.8.17;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SlotsOptionHelper} from "src/Libraries/SlotsOptionHelper.sol";
-import {UniswapV3TWAP} from "src/UniswapV3TWAP.sol";
+import {SlotsOptionHelper} from "./Libraries/SlotsOptionHelper.sol";
+import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 
 /// @title TwoSlotsOption
 /// @author @fr0xMaster
 /// @notice Mutual Slots implementation of Two Slots Option contract.
 
-// TODO: Handle refund if odd is less than 1.03 because User can loose money even if he bet on the good output;
 // TODO: Put function setter on Global variable to change FeeCollector,  Fee numerator, etc...;
 
 contract TwoSlotsOption is Ownable {
