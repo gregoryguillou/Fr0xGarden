@@ -286,28 +286,12 @@ contract TwoSlotsOption is Ownable {
         });
     }
 
-    function isContestRefundableBecauseSlotsAmount(uint256 _contestID) public view returns (bool) {
-        //TODO: Test If return true if slot Less amount is Lower than Min bet
-        //TODO: Test If return true if slot More amount is Lower than Min bet
-        //TODO: Test If return true if the two slots amount are Lower than Min bet
+    function isContestRefundable(uint256 _contestID, uint256 _maturityPrice) public view returns (bool) {
+        bool isSlotLessAmountNotValid = getAmountBetInSlot(_contestID, SlotType.LESS) < MIN_BET;
+        bool isSlotMoreAmountNotValid = getAmountBetInSlot(_contestID, SlotType.MORE) < MIN_BET;
+        bool isStartingPriceEqualsMaturityPrice = contests[_contestID].startingPrice == _maturityPrice;
 
-        //TODO: Test If return true if starting price == maturity Price;
-
-        //TODO: Test if return false if two slots have more than min bet && starting price != maturity price
-
-        bool isSlotLessAmountValid = getAmountBetInSlot(_contestID, SlotType.LESS) >= MIN_BET;
-        bool isSlotMoreAmountValid = getAmountBetInSlot(_contestID, SlotType.MORE) >= MIN_BET;
-
-        bool isRefundable = isSlotLessAmountValid && isSlotMoreAmountValid ? false : true;
-        return isRefundable;
-    }
-
-    function isContestRefundableBecauseEqualsPrices(uint256 _contestID, uint256 _maturityPrice)
-        public
-        view
-        returns (bool)
-    {
-        return contests[_contestID].startingPrice == _maturityPrice;
+        return isSlotLessAmountNotValid || isSlotMoreAmountNotValid || isStartingPriceEqualsMaturityPrice;
     }
 
     function createContest() external isCreateable returns (bool) {
