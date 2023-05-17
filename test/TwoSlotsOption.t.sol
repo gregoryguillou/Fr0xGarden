@@ -333,27 +333,7 @@ contract TwoSlotsOptionTest is Test {
         uint256 amountRemainsInMore = netToShareBetweenWinners - amountRedisitributedInMore;
         uint256 ONE_PENNY = 1e3;
 
-        assertLe(amountRemainsInLess, ONE_PENNY);
-        assertLe(amountRemainsInMore, ONE_PENNY);
-    }
-
-    function test_GetOdds_CheckReadabilityWhenSpreadBetweenOddsIsTen() public {
-        uint256 ONE_THOUSAND_USDC = 1_000 * 1e6;
-        TwoSlotsOption.Odds memory odds = twoSlotsOption.getOdds(ONE_THOUSAND_USDC, TEN_THOUSAND_USDC);
-
-        emit log_named_uint("Odd Less", odds.oddLess);
-        emit log_named_string("Readable Odd Less", odds.readableOddLess);
-        emit log_named_uint("Odd More", odds.oddMore);
-        emit log_named_string("Readable Odd More", odds.readableOddMore);
-    }
-
-    function test_GetOdds_CheckReadabilityWhenSpreadBetweenOddsIsTwenty() public {
-        uint256 ONE_THOUSAND_USDC = 1_000 * 1e6;
-        TwoSlotsOption.Odds memory odds = twoSlotsOption.getOdds(ONE_THOUSAND_USDC, ONE_THOUSAND_USDC * 20);
-
-        emit log_named_uint("Odd Less", odds.oddLess);
-        emit log_named_string("Readable Odd Less", odds.readableOddLess);
-        emit log_named_uint("Odd More", odds.oddMore);
-        emit log_named_string("Readable Odd More", odds.readableOddMore);
+        assertLt(amountRemainsInLess, ONE_PENNY);
+        assertLt(amountRemainsInMore, ONE_PENNY);
     }
 }
