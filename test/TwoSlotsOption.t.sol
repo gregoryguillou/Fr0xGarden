@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {SlotsOptionHelper} from "../src/Libraries/SlotsOptionHelper.sol";
-
 import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTest is Test {
@@ -93,7 +92,7 @@ contract TwoSlotsOptionTest is Test {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
         uint256 expectedMaturityAtTimestamp = FIRST_MAY_2023 + 20 minutes;
-        emit log_named_uint("Close At", expectedMaturityAtTimestamp);
+        emit log_named_uint("Maturity At", expectedMaturityAtTimestamp);
         assertEq(expectedMaturityAtTimestamp, twoSlotsOption.getContestMaturityAtTimestamp(1));
     }
 
@@ -336,4 +335,113 @@ contract TwoSlotsOptionTest is Test {
         assertLt(amountRemainsInLess, ONE_PENNY);
         assertLt(amountRemainsInMore, ONE_PENNY);
     }
+
+    function testFuzz_IsContestRefundableBecauseSlotsAmount_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseSlotsAmount(lastContestID);
+        assertTrue(contestRefundable);
+    }
+
+    function testFuzz_IsContestRefundableBecauseSlotsAmount_CheckIfTrueWhenSlotLessLowerThanMinBet(uint256 _amountToBet)
+        public
+    {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, _amountToBet);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet);
+        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseSlotsAmount(lastContestID);
+        assertTrue(contestRefundable);
+    }
+
+    function testFuzz_IsContestRefundable_CheckIfTrueWhenSlotMoreLowerThanMinBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, _amountToBet);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet);
+        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseSlotsAmount(lastContestID);
+        assertTrue(contestRefundable);
+    }
+
+    function testFuzz_IsContestRefundable_CheckIfFalseWhenTwoSlotsBiggerThanMinBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, _amountToBet * 2);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
+        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseSlotsAmount(lastContestID);
+        assertFalse(contestRefundable);
+    }
+
+    function testFuzz_IsContestRefundable_CheckIfTrueWhenPricesEquals() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        uint256 maturityPrice = startingPrice;
+
+        emit log_named_uint("Starting Price", startingPrice);
+        emit log_named_uint("Maturity Price", maturityPrice);
+
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseEqualsPrices(lastContestID, maturityPrice);
+        assertTrue(contestRefundable);
+    }
+
+    function testFuzz_IsContestRefundable_CheckIfFalseWhenPricesNotEquals() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        uint256 maturityPrice = startingPrice + FIVE_USDC;
+        bool contestRefundable = twoSlotsOption.isContestRefundableBecauseEqualsPrices(lastContestID, maturityPrice);
+        assertFalse(contestRefundable);
+    }
+
+    /*
+    function test_IsContestRefundable_CheckIfTrueWhenStartingPriceEqualMaturityPrice() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, ONE_MILION_USDC);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        vm.warp(FIRST_MAY_2023 + 21 minutes);
+        uint256 maturityPrice = startingPrice;
+
+        emit log_named_uint("Starting Price", startingPrice);
+        emit log_named_uint("Maturity Price", maturityPrice);
+
+        emit log_named_uint(
+            "Amount Bet In Less", twoSlotsOption.getAmountBetInSlot(lastContestID, TwoSlotsOption.SlotType.LESS)
+            );
+        emit log_named_uint(
+            "Amount Bet In More", twoSlotsOption.getAmountBetInSlot(lastContestID, TwoSlotsOption.SlotType.MORE)
+            );
+        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        assertTrue(contestRefundable);
+    }
+    */
 }

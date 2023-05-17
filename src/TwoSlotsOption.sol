@@ -12,6 +12,7 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 /// @notice Mutual Slots implementation of Two Slots Option contract.
 
 // TODO: Put function setter on Global variable to change FeeCollector,  Fee numerator, etc...;
+// TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
 
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
@@ -95,6 +96,7 @@ contract TwoSlotsOption is Ownable {
     error ContestIsAlreadyOpen(uint256 lastOpenContestID);
     error ContestNotOpen();
     error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
+    error ContestNotMature(uint256 actualTimestamp, uint256 maturityAt);
     error InsufficientBetAmount(uint256 amountBet, uint256 minBet);
     error InsufficientBalance(uint256 userBalance, uint256 amountBet);
     error InsufficientAllowance(uint256 contractAllowance, uint256 amountBet);
@@ -121,6 +123,13 @@ contract TwoSlotsOption is Ownable {
     modifier isContestInBettingPeriod(uint256 _contestID) {
         if (block.timestamp >= contests[_contestID].closeAt) {
             revert BettingPeriodExpired({actualTimestamp: block.timestamp, closeAt: contests[_contestID].closeAt});
+        }
+        _;
+    }
+
+    modifier isMature(uint256 _contestID) {
+        if (block.timestamp >= contests[_contestID].maturityAt) {
+            revert ContestNotMature({actualTimestamp: block.timestamp, maturityAt: contests[_contestID].maturityAt});
         }
         _;
     }
@@ -170,6 +179,9 @@ contract TwoSlotsOption is Ownable {
 
     event CreateContest(uint256 indexed _contestID, address indexed _creator);
     event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, SlotType _isSlotMore);
+    event CloseContest(
+        uint256 indexed _contestID, address indexed _resolver, SlotsOptionHelper.ContestStatus indexed _contestStatus
+    );
 
     function setLastOpenContestID(uint256 _id) internal {
         LAST_OPEN_CONTEST_ID = _id;
@@ -274,6 +286,30 @@ contract TwoSlotsOption is Ownable {
         });
     }
 
+    function isContestRefundableBecauseSlotsAmount(uint256 _contestID) public view returns (bool) {
+        //TODO: Test If return true if slot Less amount is Lower than Min bet
+        //TODO: Test If return true if slot More amount is Lower than Min bet
+        //TODO: Test If return true if the two slots amount are Lower than Min bet
+
+        //TODO: Test If return true if starting price == maturity Price;
+
+        //TODO: Test if return false if two slots have more than min bet && starting price != maturity price
+
+        bool isSlotLessAmountValid = getAmountBetInSlot(_contestID, SlotType.LESS) >= MIN_BET;
+        bool isSlotMoreAmountValid = getAmountBetInSlot(_contestID, SlotType.MORE) >= MIN_BET;
+
+        bool isRefundable = isSlotLessAmountValid && isSlotMoreAmountValid ? false : true;
+        return isRefundable;
+    }
+
+    function isContestRefundableBecauseEqualsPrices(uint256 _contestID, uint256 _maturityPrice)
+        public
+        view
+        returns (bool)
+    {
+        return contests[_contestID].startingPrice == _maturityPrice;
+    }
+
     function createContest() external isCreateable returns (bool) {
         uint256 newContestID = LAST_OPEN_CONTEST_ID + 1;
         contests[newContestID].contestStatus = SlotsOptionHelper.ContestStatus.OPEN;
@@ -307,4 +343,20 @@ contract TwoSlotsOption is Ownable {
         emit Bet(_contestID, msg.sender, _amountToBet, _slotType);
         return true;
     }
+
+    /**
+     * function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
+     *     //TODO: Test Revert if contest not Open
+     *     //TODO: Test revert If contest Not Mature
+     *     uint256 maturityPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
+     *     bool isRefundable = isContestRefundable(_contestID, maturityPrice);
+     *     if (isRefundable) {
+     *         contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+     *         contests[_contestID].resolver = msg.sender;
+     *     } else {
+     *         contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+     *     }
+     *     return true;
+     * }
+     */
 }
