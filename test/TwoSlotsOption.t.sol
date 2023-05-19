@@ -343,7 +343,6 @@ contract TwoSlotsOptionTest is Test {
         uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice + FIVE_USDC;
         vm.startPrank(msg.sender);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
@@ -361,7 +360,6 @@ contract TwoSlotsOptionTest is Test {
         deal(TOKEN0, msg.sender, _amountToBet);
         IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
@@ -377,7 +375,6 @@ contract TwoSlotsOptionTest is Test {
         deal(TOKEN0, msg.sender, _amountToBet);
         IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
@@ -394,7 +391,6 @@ contract TwoSlotsOptionTest is Test {
         IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertFalse(contestRefundable);
     }
@@ -411,7 +407,6 @@ contract TwoSlotsOptionTest is Test {
         IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
@@ -428,7 +423,6 @@ contract TwoSlotsOptionTest is Test {
         IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        vm.warp(FIRST_MAY_2023 + 21 minutes);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertFalse(contestRefundable);
     }
