@@ -128,7 +128,7 @@ contract TwoSlotsOption is Ownable {
     }
 
     modifier isMature(uint256 _contestID) {
-        if (block.timestamp >= contests[_contestID].maturityAt) {
+        if (block.timestamp < contests[_contestID].maturityAt) {
             revert ContestNotMature({actualTimestamp: block.timestamp, maturityAt: contests[_contestID].maturityAt});
         }
         _;
@@ -191,7 +191,7 @@ contract TwoSlotsOption is Ownable {
         return contests[_contestID].contestStatus;
     }
 
-    function getContestStartingPrice(uint256 _contestID) external view returns (uint256) {
+    function getContestStartingPrice(uint256 _contestID) public view returns (uint256) {
         return contests[_contestID].startingPrice;
     }
 
@@ -328,19 +328,35 @@ contract TwoSlotsOption is Ownable {
         return true;
     }
 
-    /**
-     * function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
-     *     //TODO: Test Revert if contest not Open
-     *     //TODO: Test revert If contest Not Mature
-     *     uint256 maturityPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
-     *     bool isRefundable = isContestRefundable(_contestID, maturityPrice);
-     *     if (isRefundable) {
-     *         contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
-     *         contests[_contestID].resolver = msg.sender;
-     *     } else {
-     *         contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
-     *     }
-     *     return true;
-     * }
-     */
+    function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
+        uint256 maturityPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
+        contests[_contestID].resolver = msg.sender;
+        contests[_contestID].maturityPrice = maturityPrice;
+        bool isRefundable = isContestRefundable(_contestID, maturityPrice);
+        if (isRefundable) {
+            //TODO: Test if closeCOntest  is on status refundable when it have to do.
+            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+            emit CloseContest(_contestID, msg.sender, SlotsOptionHelper.ContestStatus.REFUNDABLE);
+            //TODO: Test if event is emit in this situation.
+        } else {
+            //TODO: Test if closeCOntest is on status resolved when it have to do.
+            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+
+            uint256 amountInSlotLess = getAmountBetInSlot(_contestID, SlotType.LESS);
+            uint256 amountInSlotMore = getAmountBetInSlot(_contestID, SlotType.MORE);
+            Odds memory odds = getOdds(amountInSlotLess, amountInSlotMore);
+            contests[_contestID].slotLess.odd = odds.oddLess;
+            contests[_contestID].slotMore.odd = odds.oddMore;
+            //TODO: Test if oddLess and oddMore are more than 0 when contest is Resolved
+
+            uint256 startingPrice = getContestStartingPrice(_contestID);
+            //TODO: Test if winningSlot is more when maturityPrice>startingPrice.
+            //TODO: Test if winningSlot is less when maturityPrice>startingPrice.
+            contests[_contestID].winningSlot = maturityPrice > startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+            emit CloseContest(_contestID, msg.sender, SlotsOptionHelper.ContestStatus.RESOLVED);
+            //TODO: Test if event is emit in this situation.
+        }
+
+        return true;
+    }
 }

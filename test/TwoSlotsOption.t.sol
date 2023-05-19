@@ -336,7 +336,7 @@ contract TwoSlotsOptionTest is Test {
         assertLt(amountRemainsInMore, ONE_PENNY);
     }
 
-    function testFuzz_IsContestRefundable_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
+    function test_IsContestRefundable_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
         vm.warp(FIRST_MAY_2023);
         twoSlotsOption.createContest();
         uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
@@ -425,5 +425,26 @@ contract TwoSlotsOptionTest is Test {
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
         bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertFalse(contestRefundable);
+    }
+
+    function test_CloseContest_RevertIfContestNotOpen() public {
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.expectRevert(TwoSlotsOption.ContestNotOpen.selector);
+        twoSlotsOption.closeContest(lastContestID + 1);
+    }
+
+    function test_CloseContest_RevertIfContestNotMature() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.warp(FIRST_MAY_2023 + 12 minutes);
+        uint256 nowTimestamp = block.timestamp;
+        uint256 maturityAt = twoSlotsOption.getContestMaturityAtTimestamp(lastContestID);
+        SlotsOptionHelper.ContestStatus status = SlotsOptionHelper.ContestStatus.OPEN;
+        assertEq(uint8(status), 1);
+        assertLt(nowTimestamp, maturityAt);
+        vm.expectRevert(abi.encodeWithSelector(TwoSlotsOption.ContestNotMature.selector, block.timestamp, maturityAt));
+        twoSlotsOption.closeContest(lastContestID);
     }
 }

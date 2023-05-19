@@ -34,7 +34,7 @@ library SlotsOptionHelper {
 
     struct Slot {
         uint256 totalAmount;
-        uint256 payout;
+        uint256 odd;
         mapping(address => Option) options;
     }
 
