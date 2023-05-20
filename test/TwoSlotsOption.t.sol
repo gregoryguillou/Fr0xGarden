@@ -447,4 +447,36 @@ contract TwoSlotsOptionTest is Test {
         vm.expectRevert(abi.encodeWithSelector(TwoSlotsOption.ContestNotMature.selector, block.timestamp, maturityAt));
         twoSlotsOption.closeContest(lastContestID);
     }
+
+    function test_CloseContest_CheckIfContestStatusRefundableWhenNoBetInOneSlot() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, ONE_MILION_USDC);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        vm.warp(FIRST_MAY_2023 + 22 minutes);
+        twoSlotsOption.closeContest(lastContestID);
+        SlotsOptionHelper.ContestStatus status = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+        assertEq(uint8(status), 3);
+    }
+
+    function test_CloseContest_CheckIfContestStatusRefundableWhenEqualsStartAndMaturityPrice() public {
+        vm.warp(FIRST_MAY_2023);
+        twoSlotsOption.createContest();
+        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        deal(TOKEN0, msg.sender, ONE_MILION_USDC);
+        IERC20(TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        vm.warp(FIRST_MAY_2023 + 22 minutes);
+        twoSlotsOption.closeContest(lastContestID);
+        SlotsOptionHelper.ContestStatus status = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 maturityPrice = twoSlotsOption.getContestMaturityPrice(lastContestID);
+        assertEq(startingPrice, maturityPrice);
+        assertEq(uint8(status), 3);
+    }
 }

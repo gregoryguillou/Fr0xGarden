@@ -334,7 +334,6 @@ contract TwoSlotsOption is Ownable {
         contests[_contestID].maturityPrice = maturityPrice;
         bool isRefundable = isContestRefundable(_contestID, maturityPrice);
         if (isRefundable) {
-            //TODO: Test if closeCOntest  is on status refundable when it have to do.
             contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
             emit CloseContest(_contestID, msg.sender, SlotsOptionHelper.ContestStatus.REFUNDABLE);
             //TODO: Test if event is emit in this situation.
