@@ -45,30 +45,64 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function testFuzz_GetFeesByAmount_MoreThanZero(uint256 _amount) public {
-        vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= HUNDRED_MILION_USDC);
+        _amount = bound(_amount, twoSlotsOption.MIN_BET(), HUNDRED_MILION_USDC);
+        uint256 MAX_FEE_CREATOR = 5 * 1e6;
+        uint256 MAX_FEE_RESOLVER = 50 * 1e6;
         SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
             _amount,
             twoSlotsOption.FEE_COLLECTOR_NUMERATOR(),
             twoSlotsOption.FEE_CREATOR_NUMERATOR(),
             twoSlotsOption.FEE_RESOLVER_NUMERATOR(),
             twoSlotsOption.FEE_DENOMINATOR(),
-            FIVE_USDC,
-            FIVE_USDC
+            MAX_FEE_CREATOR,
+            MAX_FEE_RESOLVER
         );
-
         uint256 totalFees = fees.total;
         emit log_named_uint("Amount Expected: ", totalFees);
         assertGt(totalFees, 0);
     }
 
-//TODO: ADD Test on Function to check if _amount == total
-//TODO: ADD Test on Function to check if creator < resolver 
-//TODO: ADD Test on Function to check if creator is limited to 5 USDC
-//TODO: ADD Test on Function to check if resolver is limited to 50USDC
-//TODO: ADD Test on Function to check if total == collector+creator+resolver
+    function testFuzz_GetFeesByAmount_TotalEqualAllEntites(uint256 _amount) public {
+        _amount = bound(_amount, twoSlotsOption.MIN_BET(), HUNDRED_MILION_USDC);
+        uint256 MAX_FEE_CREATOR = 5 * 1e6;
+        uint256 MAX_FEE_RESOLVER = 50 * 1e6;
+        SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
+            _amount,
+            twoSlotsOption.FEE_COLLECTOR_NUMERATOR(),
+            twoSlotsOption.FEE_CREATOR_NUMERATOR(),
+            twoSlotsOption.FEE_RESOLVER_NUMERATOR(),
+            twoSlotsOption.FEE_DENOMINATOR(),
+            MAX_FEE_CREATOR,
+            MAX_FEE_RESOLVER
+        );
+        uint256 totalFees = fees.total;
+        emit log_named_uint("Amount Expected: ", totalFees);
+        uint256 allEntites = fees.collector + fees.creator + fees.resolver;
+        emit log_named_uint("All Entites: ", allEntites);
+        assertEq(totalFees, allEntites);
+    }
 
-
-
+    function test_GetFeesByAmount_CheckCreatorResolverLimitationsFees(uint256 _amount) public {
+        _amount = bound(_amount, twoSlotsOption.MIN_BET(), HUNDRED_MILION_USDC);
+        uint256 MAX_FEE_CREATOR = 5 * 1e6;
+        uint256 MAX_FEE_RESOLVER = 50 * 1e6;
+        SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
+            _amount,
+            twoSlotsOption.FEE_COLLECTOR_NUMERATOR(),
+            twoSlotsOption.FEE_CREATOR_NUMERATOR(),
+            twoSlotsOption.FEE_RESOLVER_NUMERATOR(),
+            twoSlotsOption.FEE_DENOMINATOR(),
+            MAX_FEE_CREATOR,
+            MAX_FEE_RESOLVER
+        );
+        uint256 totalFees = fees.total;
+        emit log_named_uint("Amount Expected: ", totalFees);
+        emit log_named_uint("Fees Creator: ", fees.creator);
+        emit log_named_uint("Fees Resolver: ", fees.resolver);
+        assertLt(fees.creator, fees.resolver);
+        assertLe(fees.creator, MAX_FEE_CREATOR);
+        assertLe(fees.resolver, MAX_FEE_RESOLVER);
+    }
 
     function test_CreateContest_CheckIfNewContestCreated() public {
         uint256 expected = twoSlotsOption.LAST_OPEN_CONTEST_ID();

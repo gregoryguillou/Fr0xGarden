@@ -72,7 +72,7 @@ library SlotsOptionHelper {
         uint256 creatorFees = getFee(total, _feeCreatorNumerator, _feeDenominator);
         uint256 resolverFees = getFee(total, _feeResolverNumerator, _feeDenominator);
         uint256 creator = creatorFees < _maxFeeCreator ? creatorFees : _maxFeeCreator;
-        uint256 resolver = creatorFees < _maxFeeResolver ? resolverFees : _maxFeeResolver;
+        uint256 resolver = resolverFees < _maxFeeResolver ? resolverFees : _maxFeeResolver;
         uint256 collector = total - (creator + resolver);
         return Fees({total: total, collector: collector, creator: creator, resolver: resolver});
     }
