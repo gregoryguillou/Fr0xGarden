@@ -34,26 +34,47 @@ library SlotsOptionHelper {
 
     struct Slot {
         uint256 totalAmount;
-        uint256 odd;
+        uint256 payout;
         mapping(address => Option) options;
+    }
+
+    struct Fees {
+        uint256 total;
+        uint256 collector;
+        uint256 creator;
+        uint256 resolver;
     }
 
     struct ContestFinancialData {
         uint256 totalGrossBet;
-        uint256 fees;
+        Fees fees;
         uint256 netToShareBetweenWinners;
+    }
+
+    function getFee(uint256 _amount, uint8 _feeNumerator, uint8 _feeDenominator) internal pure returns (uint256) {
+        return _amount * (_feeNumerator) / (_feeDenominator);
     }
 
     /// @notice Calculate fees to be deducted from a given amount
     /// @dev Fee amount by dividing the numerator by the denominator which - e.g: 3/100 = 0.03 or 3% percent;
     /// @param _amount amount between 1e15 & 1e20.
     /// @return fees amount in wei
-    function getFeeByAmount(uint256 _amount, uint8 _feeNumerator, uint8 _feeDenominator)
-        public
-        pure
-        returns (uint256)
-    {
-        return _amount * (_feeNumerator) / (_feeDenominator);
+    function getFeesByAmount(
+        uint256 _amount,
+        uint8 _feeCollectorNumerator,
+        uint8 _feeCreatorNumerator,
+        uint8 _feeResolverNumerator,
+        uint8 _feeDenominator,
+        uint256 _maxFeeCreator,
+        uint256 _maxFeeResolver
+    ) public pure returns (Fees memory) {
+        uint256 total = getFee(_amount, _feeCollectorNumerator, _feeDenominator);
+        uint256 creatorFees = getFee(total, _feeCreatorNumerator, _feeDenominator);
+        uint256 resolverFees = getFee(total, _feeResolverNumerator, _feeDenominator);
+        uint256 creator = creatorFees < _maxFeeCreator ? creatorFees : _maxFeeCreator;
+        uint256 resolver = creatorFees < _maxFeeResolver ? resolverFees : _maxFeeResolver;
+        uint256 collector = total - (creator + resolver);
+        return Fees({total: total, collector: collector, creator: creator, resolver: resolver});
     }
 
     function numToFixedLengthStr(uint256 _decimalPlaces, uint256 _num) public pure returns (string memory) {

@@ -13,6 +13,8 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 
 // TODO: Put function setter on Global variable to change FeeCollector,  Fee numerator, etc...;
 // TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
+//TODO: add  MAX_FEE_CREATOR AND MAX_FEE_RESOLVER and setter to have flexibility and avoid stack too deep error in constructor
+// TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
 
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
@@ -25,10 +27,11 @@ contract TwoSlotsOption is Ownable {
     uint8 public SECONDS_FOR_ORACLE_TWAP; // fees of the desired Uniswap pool in order to use the V3 oracle features
     UniswapV3TWAP uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
-    uint256 public MAX_BET_IN_SLOT; // maximum amount Bet in Slot to allow a precise redistribution of the gains
-    uint256 public PRECISION_FACTOR; // used to allow for better accuracy of odds and redistribution of winnings
-    uint8 public FEE_NUMERATOR; // numerator to calculate fees
+    uint256 public PRECISION_FACTOR = 1e12;
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
+    uint8 public FEE_COLLECTOR_NUMERATOR; // numerator to calculate fees for collector
+    uint8 public FEE_CREATOR_NUMERATOR; // numerator to calculate fees for creator
+    uint8 public FEE_RESOLVER_NUMERATOR; // numerator to calculate fees for resolver
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
     mapping(uint256 => Contest) contests; // mapping of all contests formatted as struct.
@@ -40,11 +43,11 @@ contract TwoSlotsOption is Ownable {
         address _TOKEN1,
         uint24 _UNISWAP_POOL_FEE,
         uint8 _SECONDS_FOR_ORACLE_TWAP,
-        uint8 _FEE_NUMERATOR,
         uint8 _FEE_DENOMINATOR,
+        uint8 _FEE_COLLECTOR_NUMERATOR,
+        uint8 _FEE_CREATOR_NUMERATOR,
+        uint8 _FEE_RESOLVER_NUMERATOR,
         uint256 _MIN_BET,
-        uint256 _MAX_BET_IN_SLOT,
-        uint256 _PRECISION_FACTOR,
         uint256 _EPOCH
     ) {
         FEES_COLLECTOR = _FEES_COLLECTOR;
@@ -53,11 +56,11 @@ contract TwoSlotsOption is Ownable {
         TOKEN1 = _TOKEN1;
         UNISWAP_POOL_FEE = _UNISWAP_POOL_FEE;
         SECONDS_FOR_ORACLE_TWAP = _SECONDS_FOR_ORACLE_TWAP;
-        FEE_NUMERATOR = _FEE_NUMERATOR;
         FEE_DENOMINATOR = _FEE_DENOMINATOR;
+        FEE_COLLECTOR_NUMERATOR = _FEE_COLLECTOR_NUMERATOR;
+        FEE_CREATOR_NUMERATOR = _FEE_CREATOR_NUMERATOR;
+        FEE_RESOLVER_NUMERATOR = _FEE_RESOLVER_NUMERATOR;
         MIN_BET = _MIN_BET;
-        MAX_BET_IN_SLOT = _MAX_BET_IN_SLOT;
-        PRECISION_FACTOR = _PRECISION_FACTOR;
         EPOCH = _EPOCH;
         uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
     }
@@ -169,14 +172,6 @@ contract TwoSlotsOption is Ownable {
         _;
     }
 
-    modifier isMaxAmountNotReached(uint256 _contestID, uint256 _amountToBet, SlotType _slotType) {
-        if (getAmountBetInSlot(_contestID, _slotType) + _amountToBet > MAX_BET_IN_SLOT) {
-            uint256 maxBetRemaining = MAX_BET_IN_SLOT - getAmountBetInSlot(_contestID, _slotType);
-            revert MaxAmountInSlotReached({amountBet: _amountToBet, slot: _slotType, maxBetRemaining: maxBetRemaining});
-        }
-        _;
-    }
-
     event CreateContest(uint256 indexed _contestID, address indexed _creator);
     event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, SlotType _isSlotMore);
     event CloseContest(
@@ -232,9 +227,9 @@ contract TwoSlotsOption is Ownable {
         return chosenSlot.totalAmount;
     }
 
-    function getContestOdd(uint256 _contestID, SlotType _slotType) external view returns (uint256) {
+    function getContestPayout(uint256 _contestID, SlotType _slotType) external view returns (uint256) {
         SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
-        return chosenSlot.odd;
+        return chosenSlot.payout;
     }
 
     function getAmountBetInOption(uint256 _contestID, SlotType _slotType, address _user)
@@ -260,15 +255,28 @@ contract TwoSlotsOption is Ownable {
         view
         returns (SlotsOptionHelper.ContestFinancialData memory)
     {
+        uint256 MAX_FEE_CREATOR = 5 * 1e6;
+        uint256 MAX_FEE_RESOLVER = 50 * 1e6;
         uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
-        uint256 fees = SlotsOptionHelper.getFeeByAmount(totalGrossBet, FEE_NUMERATOR, FEE_DENOMINATOR);
-        uint256 netToShareBetweenWinners = totalGrossBet - fees;
+        SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
+            totalGrossBet,
+            FEE_COLLECTOR_NUMERATOR,
+            FEE_CREATOR_NUMERATOR,
+            FEE_RESOLVER_NUMERATOR,
+            FEE_DENOMINATOR,
+            MAX_FEE_CREATOR,
+            MAX_FEE_RESOLVER
+        );
+        uint256 netToShareBetweenWinners = totalGrossBet - fees.total;
+
         return SlotsOptionHelper.ContestFinancialData({
             totalGrossBet: totalGrossBet,
             fees: fees,
             netToShareBetweenWinners: netToShareBetweenWinners
         });
     }
+
+    function dispatchFees() internal returns (bool) {}
 
     function getOdds(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
         public
@@ -319,7 +327,6 @@ contract TwoSlotsOption is Ownable {
         isSufficientBetAmount(_amountToBet)
         isSufficientBalance(_amountToBet)
         isSufficientAllowance(_amountToBet)
-        isMaxAmountNotReached(_contestID, _amountToBet, _slotType)
         returns (bool)
     {
         SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
@@ -347,16 +354,16 @@ contract TwoSlotsOption is Ownable {
             uint256 amountInSlotLess = getAmountBetInSlot(_contestID, SlotType.LESS);
             uint256 amountInSlotMore = getAmountBetInSlot(_contestID, SlotType.MORE);
             Odds memory odds = getOdds(amountInSlotLess, amountInSlotMore);
-            contests[_contestID].slotLess.odd = odds.oddLess;
-            contests[_contestID].slotMore.odd = odds.oddMore;
+            contests[_contestID].slotLess.payout = odds.oddLess;
+            contests[_contestID].slotMore.payout = odds.oddMore;
             uint256 startingPrice = getContestStartingPrice(_contestID);
             contests[_contestID].winningSlot = maturityPrice > startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
 
             //TODO: DispatchFees function;
-                    //calculate fees for creator
-                    // calculate fees for resolver
-                    // calcultate fee for collector
-                    //send fees to resolver (msg.sender);
+            //calculate fees for creator
+            // calculate fees for resolver
+            // calcultate fee for collector
+            //send fees to resolver (msg.sender);
             // bool success = dispatchFees() ?
 
             //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR;

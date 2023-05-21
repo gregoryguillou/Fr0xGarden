@@ -24,11 +24,11 @@ contract TwoSlotsOptionTest is Test {
     uint256 public constant TEN_THOUSAND_USDC = 10_000 * 1e6; // 10000 dollars in USDC  exponential notation of 6 decimals
     uint256 public constant ONE_MILION_USDC = 1_000_000 * 1e6; // 1M dollars in USDC  exponential notation of 6 decimals, to assign MAX BET
     uint256 public constant HUNDRED_MILION_USDC = 100_000_000 * 1e6; // 100M dollars in USDC exponential notation of 6 decimals, to assign MAX BET
-    uint256 public constant MAX_BET_IN_SLOT = 100_000_000 * 1e6;
-    uint256 public PRECISION_FACTOR = 1e12;
     uint24 UNISWAP_POOL_FEE = 3000;
     uint8 public SECONDS_FOR_ORACLE_TWAP = 6;
-    uint8 public FEE_NUMERATOR = 3; // numerator to calculate fees
+    uint8 public FEE_COLLECTOR_NUMERATOR = 3; // numerator to calculate fees
+    uint8 public FEE_CREATOR_NUMERATOR = 2; // numerator to calculate fees
+    uint8 public FEE_RESOLVER_NUMERATOR = 8; // numerator to calculate fees
     uint8 public FEE_DENOMINATOR = 100; // denominator to calculate fees
     uint256 public EPOCH = 10 minutes; // duration of an epoch expressed in seconds
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
@@ -39,20 +39,36 @@ contract TwoSlotsOptionTest is Test {
         arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
         vm.selectFork(arbitrumFork);
         twoSlotsOption =
-        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP, FEE_NUMERATOR, FEE_DENOMINATOR, FIVE_USDC,MAX_BET_IN_SLOT,PRECISION_FACTOR, EPOCH);
+        new TwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP,FEE_DENOMINATOR, FEE_COLLECTOR_NUMERATOR,FEE_CREATOR_NUMERATOR ,FEE_RESOLVER_NUMERATOR, FIVE_USDC, EPOCH);
         MOCK_TwoSlotsOption =
-        new MockTwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP, FEE_NUMERATOR, FEE_DENOMINATOR, FIVE_USDC,MAX_BET_IN_SLOT,PRECISION_FACTOR, EPOCH);
+        new MockTwoSlotsOption(FEE_COLLECTOR,FACTORY,TOKEN0,TOKEN1,UNISWAP_POOL_FEE, SECONDS_FOR_ORACLE_TWAP,FEE_DENOMINATOR, FEE_COLLECTOR_NUMERATOR,FEE_CREATOR_NUMERATOR ,FEE_RESOLVER_NUMERATOR, FIVE_USDC, EPOCH);
     }
 
-    function testFuzz_GetFeeByAmount_TestCalculations(uint256 _amount) public {
-        vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= twoSlotsOption.MAX_BET_IN_SLOT());
-        uint256 expected = _amount * twoSlotsOption.FEE_NUMERATOR() / twoSlotsOption.FEE_DENOMINATOR();
-        emit log_named_uint("Amount Expected: ", expected);
-        assertEq(
-            SlotsOptionHelper.getFeeByAmount(_amount, twoSlotsOption.FEE_NUMERATOR(), twoSlotsOption.FEE_DENOMINATOR()),
-            expected
+    function testFuzz_GetFeesByAmount_MoreThanZero(uint256 _amount) public {
+        vm.assume(_amount >= twoSlotsOption.MIN_BET() && _amount <= HUNDRED_MILION_USDC);
+        SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
+            _amount,
+            twoSlotsOption.FEE_COLLECTOR_NUMERATOR(),
+            twoSlotsOption.FEE_CREATOR_NUMERATOR(),
+            twoSlotsOption.FEE_RESOLVER_NUMERATOR(),
+            twoSlotsOption.FEE_DENOMINATOR(),
+            FIVE_USDC,
+            FIVE_USDC
         );
+
+        uint256 totalFees = fees.total;
+        emit log_named_uint("Amount Expected: ", totalFees);
+        assertGt(totalFees, 0);
     }
+
+//TODO: ADD Test on Function to check if _amount == total
+//TODO: ADD Test on Function to check if creator < resolver 
+//TODO: ADD Test on Function to check if creator is limited to 5 USDC
+//TODO: ADD Test on Function to check if resolver is limited to 50USDC
+//TODO: ADD Test on Function to check if total == collector+creator+resolver
+
+
+
 
     function test_CreateContest_CheckIfNewContestCreated() public {
         uint256 expected = twoSlotsOption.LAST_OPEN_CONTEST_ID();
@@ -172,36 +188,6 @@ contract TwoSlotsOptionTest is Test {
         twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
     }
 
-    function testFuzz_Bet_RevertIfMaxAmountInSlotReached(uint256 _amountAlreadyBet) public {
-        _amountAlreadyBet = bound(_amountAlreadyBet, MAX_BET_IN_SLOT - ONE_MILION_USDC, MAX_BET_IN_SLOT);
-        emit log_named_uint("Amount Already Bet", _amountAlreadyBet);
-
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
-        vm.startPrank(msg.sender);
-        deal(TOKEN0, msg.sender, _amountAlreadyBet);
-        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountAlreadyBet);
-        twoSlotsOption.bet(lastContestID, _amountAlreadyBet, TwoSlotsOption.SlotType.LESS);
-        vm.stopPrank();
-        uint256 amountRemainingToBet = MAX_BET_IN_SLOT - _amountAlreadyBet;
-        emit log_named_uint("Amount Remaining To Bet", amountRemainingToBet);
-
-        uint256 _amountToBet = amountRemainingToBet + FIVE_USDC;
-        deal(TOKEN0, alice, _amountToBet);
-        vm.startPrank(alice);
-        IERC20(TOKEN0).approve(address(twoSlotsOption), _amountToBet);
-        emit log_named_uint("Amount To Bet", _amountToBet);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TwoSlotsOption.MaxAmountInSlotReached.selector,
-                _amountToBet,
-                TwoSlotsOption.SlotType.LESS,
-                amountRemainingToBet
-            )
-        );
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-    }
-
     function testFuzz_Bet_CheckIfUserBetIncreaseTotalAmountInSlot(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         twoSlotsOption.createContest();
@@ -304,16 +290,16 @@ contract TwoSlotsOptionTest is Test {
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
-        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
-        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
+        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
 
         SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
             twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
         TwoSlotsOption.Odds memory odds = twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore);
         uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
 
-        uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / PRECISION_FACTOR;
-        uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / PRECISION_FACTOR;
+        uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+        uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / twoSlotsOption.PRECISION_FACTOR();
 
         assertGe(netToShareBetweenWinners, amountRedisitributedInLess);
         assertGe(netToShareBetweenWinners, amountRedisitributedInMore);
@@ -322,16 +308,16 @@ contract TwoSlotsOptionTest is Test {
     function testFuzz_GetOdds_AmountRemainsLowerThanOnePenny(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
         public
     {
-        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
-        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, twoSlotsOption.MAX_BET_IN_SLOT());
+        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
 
         SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
             twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
         TwoSlotsOption.Odds memory odds = twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore);
         uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
 
-        uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / PRECISION_FACTOR;
-        uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / PRECISION_FACTOR;
+        uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+        uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / twoSlotsOption.PRECISION_FACTOR();
         uint256 amountRemainsInLess = netToShareBetweenWinners - amountRedisitributedInLess;
         uint256 amountRemainsInMore = netToShareBetweenWinners - amountRedisitributedInMore;
         uint256 ONE_PENNY = 1e3;
@@ -528,9 +514,9 @@ contract TwoSlotsOptionTest is Test {
         SlotsOptionHelper.ContestStatus status = MOCK_TwoSlotsOption.getContestStatus(lastContestID);
         assertEq(uint8(expectedStatus), uint8(status));
 
-        uint256 payoutLess = MOCK_TwoSlotsOption.getContestOdd(lastContestID, MockTwoSlotsOption.SlotType.LESS);
+        uint256 payoutLess = MOCK_TwoSlotsOption.getContestPayout(lastContestID, MockTwoSlotsOption.SlotType.LESS);
         emit log_named_uint("Payout Less", payoutLess);
-        uint256 payoutMore = MOCK_TwoSlotsOption.getContestOdd(lastContestID, MockTwoSlotsOption.SlotType.MORE);
+        uint256 payoutMore = MOCK_TwoSlotsOption.getContestPayout(lastContestID, MockTwoSlotsOption.SlotType.MORE);
         emit log_named_uint("Payout Less", payoutMore);
         assertGt(payoutLess, 0);
         assertGt(payoutMore, 0);
