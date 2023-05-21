@@ -32,6 +32,8 @@ contract TwoSlotsOption is Ownable {
     uint8 public FEE_COLLECTOR_NUMERATOR; // numerator to calculate fees for collector
     uint8 public FEE_CREATOR_NUMERATOR; // numerator to calculate fees for creator
     uint8 public FEE_RESOLVER_NUMERATOR; // numerator to calculate fees for resolver
+    uint64 MAX_FEE_CREATOR = 5 * 1e6;
+    uint64 MAX_FEE_RESOLVER = 50 * 1e6;
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
     mapping(uint256 => Contest) contests; // mapping of all contests formatted as struct.
@@ -89,7 +91,10 @@ contract TwoSlotsOption is Ownable {
         SlotsOptionHelper.Slot slotMore;
     }
 
-    struct Odds {
+    struct ContestFinancialData {
+        uint256 totalGrossBet;
+        uint256 netToShareBetweenWinners;
+        SlotsOptionHelper.Fees fees;
         uint256 oddLess;
         string readableOddLess;
         uint256 oddMore;
@@ -253,10 +258,8 @@ contract TwoSlotsOption is Ownable {
     function getContestFinancialData(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
         public
         view
-        returns (SlotsOptionHelper.ContestFinancialData memory)
+        returns (ContestFinancialData memory)
     {
-        uint256 MAX_FEE_CREATOR = 5 * 1e6;
-        uint256 MAX_FEE_RESOLVER = 50 * 1e6;
         uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
         SlotsOptionHelper.Fees memory fees = SlotsOptionHelper.getFeesByAmount(
             totalGrossBet,
@@ -268,34 +271,17 @@ contract TwoSlotsOption is Ownable {
             MAX_FEE_RESOLVER
         );
         uint256 netToShareBetweenWinners = totalGrossBet - fees.total;
+        uint256 oddLess = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotLess;
+        uint256 oddMore = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotMore;
 
-        return SlotsOptionHelper.ContestFinancialData({
+        return ContestFinancialData({
             totalGrossBet: totalGrossBet,
+            netToShareBetweenWinners: netToShareBetweenWinners,
             fees: fees,
-            netToShareBetweenWinners: netToShareBetweenWinners
-        });
-    }
-
-    function dispatchFees() internal returns (bool) {}
-
-    function getOdds(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
-        public
-        view
-        isSufficientAmountInSlots(_amountInSlotLess, _amountInSlotMore)
-        returns (Odds memory)
-    {
-        SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
-            getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
-        uint256 oddLess = contestFinancialData.netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotLess;
-        string memory readableOddLess = SlotsOptionHelper.getDecimalsStringFromOdd(3, oddLess, PRECISION_FACTOR, 1000);
-        uint256 oddMore = contestFinancialData.netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotMore;
-        string memory readableOddMore = SlotsOptionHelper.getDecimalsStringFromOdd(3, oddMore, PRECISION_FACTOR, 1000);
-
-        return Odds({
             oddLess: oddLess,
-            readableOddLess: readableOddLess,
+            readableOddLess: SlotsOptionHelper.getDecimalsStringFromOdd(3, oddLess, PRECISION_FACTOR, 1000),
             oddMore: oddMore,
-            readableOddMore: readableOddMore
+            readableOddMore: SlotsOptionHelper.getDecimalsStringFromOdd(3, oddMore, PRECISION_FACTOR, 1000)
         });
     }
 
@@ -342,35 +328,34 @@ contract TwoSlotsOption is Ownable {
 
     function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
         uint256 maturityPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
-        contests[_contestID].resolver = msg.sender;
-        contests[_contestID].maturityPrice = maturityPrice;
         bool isRefundable = isContestRefundable(_contestID, maturityPrice);
 
         if (isRefundable) {
             contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
-            emit CloseContest(_contestID, msg.sender, SlotsOptionHelper.ContestStatus.REFUNDABLE);
         } else {
-            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
-            uint256 amountInSlotLess = getAmountBetInSlot(_contestID, SlotType.LESS);
-            uint256 amountInSlotMore = getAmountBetInSlot(_contestID, SlotType.MORE);
-            Odds memory odds = getOdds(amountInSlotLess, amountInSlotMore);
-            contests[_contestID].slotLess.payout = odds.oddLess;
-            contests[_contestID].slotMore.payout = odds.oddMore;
-            uint256 startingPrice = getContestStartingPrice(_contestID);
-            contests[_contestID].winningSlot = maturityPrice > startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
-
-            //TODO: DispatchFees function;
-            //calculate fees for creator
-            // calculate fees for resolver
-            // calcultate fee for collector
-            //send fees to resolver (msg.sender);
-            // bool success = dispatchFees() ?
-
-            //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR;
-
-            emit CloseContest(_contestID, msg.sender, SlotsOptionHelper.ContestStatus.RESOLVED);
+            ContestFinancialData memory contestFinancialData = getContestFinancialData(
+                contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
+            );
+            WinningSlot winningSlot =
+                maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+            contests[_contestID].maturityPrice = maturityPrice;
+            contests[_contestID].resolver = msg.sender;
+            contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
+            contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
+            contests[_contestID].winningSlot = winningSlot;
+            contests[_contestID].contestStatus =
+                isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED;
         }
+        emit CloseContest(
+            _contestID,
+            msg.sender,
+            isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
+            ); //IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
+            //IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
+            //IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
+            //TODO/TEST
 
+        //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR;
         return true;
     }
 }

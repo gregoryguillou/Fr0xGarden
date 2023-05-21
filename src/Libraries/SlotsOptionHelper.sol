@@ -45,12 +45,6 @@ library SlotsOptionHelper {
         uint256 resolver;
     }
 
-    struct ContestFinancialData {
-        uint256 totalGrossBet;
-        Fees fees;
-        uint256 netToShareBetweenWinners;
-    }
-
     function getFee(uint256 _amount, uint8 _feeNumerator, uint8 _feeDenominator) internal pure returns (uint256) {
         return _amount * (_feeNumerator) / (_feeDenominator);
     }
