@@ -13,6 +13,8 @@ import {UniswapV3TWAP} from "../UniswapV3TWAP.sol";
 
 // TODO: Put function setter on Global variable to change FeeCollector,  Fee numerator, etc...;
 // TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
+//TODO: add  MAX_FEE_CREATOR AND MAX_FEE_RESOLVER and setter to have flexibility and avoid stack too deep error in constructor
+// TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
 
 contract MockTwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
@@ -284,8 +286,8 @@ contract MockTwoSlotsOption is Ownable {
     }
 
     function isContestRefundable(uint256 _contestID, uint256 _maturityPrice) public view returns (bool) {
-        bool isSlotLessAmountNotValid = contests[_contestID].slotLess.totalAmount < MIN_BET;
-        bool isSlotMoreAmountNotValid = contests[_contestID].slotLess.totalAmount < MIN_BET;
+        bool isSlotLessAmountNotValid = getAmountBetInSlot(_contestID, SlotType.LESS) < MIN_BET;
+        bool isSlotMoreAmountNotValid = getAmountBetInSlot(_contestID, SlotType.MORE) < MIN_BET;
         bool isStartingPriceEqualsMaturityPrice = contests[_contestID].startingPrice == _maturityPrice;
 
         return isSlotLessAmountNotValid || isSlotMoreAmountNotValid || isStartingPriceEqualsMaturityPrice;
@@ -335,21 +337,21 @@ contract MockTwoSlotsOption is Ownable {
             : uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP) - _fakeMaturityPrice;
         bool isRefundable = isContestRefundable(_contestID, maturityPrice);
 
-        ContestFinancialData memory contestFinancialData = getContestFinancialData(
-            contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
-        );
+        if (isRefundable) {
+            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+        } else {
+            ContestFinancialData memory contestFinancialData = getContestFinancialData(
+                contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
+            );
+            contests[_contestID].maturityPrice = maturityPrice;
+            contests[_contestID].resolver = msg.sender;
 
-        WinningSlot winningSlot =
-            maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
-
-        contests[_contestID].maturityPrice = maturityPrice;
-        contests[_contestID].resolver = msg.sender;
-
-        contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
-        contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
-        contests[_contestID].winningSlot = winningSlot;
-        contests[_contestID].contestStatus =
-            isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED;
+            contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
+            contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
+            contests[_contestID].winningSlot =
+                maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+        }
 
         emit CloseContest(
             _contestID,

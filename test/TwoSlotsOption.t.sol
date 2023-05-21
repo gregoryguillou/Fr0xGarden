@@ -624,7 +624,7 @@ contract TwoSlotsOptionTest is Test {
         SlotsOptionHelper.ContestStatus status = MOCK_TwoSlotsOption.getContestStatus(lastContestID);
         assertEq(uint8(expectedStatus), uint8(status));
 
-        //Test balance resolver, creator, collector
+        //TODO: Test balance resolver, creator, collector
         MockTwoSlotsOption.WinningSlot expectedWinningSlot = MockTwoSlotsOption.WinningSlot.LESS;
         MockTwoSlotsOption.WinningSlot winningSlot = MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID);
         assertEq(uint8(expectedWinningSlot), uint8(winningSlot));

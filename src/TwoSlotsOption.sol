@@ -336,26 +336,26 @@ contract TwoSlotsOption is Ownable {
             ContestFinancialData memory contestFinancialData = getContestFinancialData(
                 contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
             );
-            WinningSlot winningSlot =
-                maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+
             contests[_contestID].maturityPrice = maturityPrice;
             contests[_contestID].resolver = msg.sender;
             contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
             contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
-            contests[_contestID].winningSlot = winningSlot;
-            contests[_contestID].contestStatus =
-                isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED;
+            contests[_contestID].winningSlot =
+                maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+            //TODO:Create Function to change all states variables
+            //IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
+            //IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
+            //IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
+            //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR
         }
         emit CloseContest(
             _contestID,
             msg.sender,
             isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
-            ); //IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
-            //IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
-            //IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
-            //TODO/TEST
+            );
 
-        //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR;
         return true;
     }
 }
