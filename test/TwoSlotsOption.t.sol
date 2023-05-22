@@ -285,105 +285,88 @@ contract TwoSlotsOptionTest is Test {
         assertEq(contractBalanceAfterUserBet, userBalanceBeforeBet);
     }
 
-    //TODO Put modifier amount in slot on getCOntestdata func
-    /**
-     * function testFuzz_GetOdds_RevertIfInsufficientAmountInSlots(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
-     *     public
-     * {
-     *     _amountInSlotLess = bound(_amountInSlotLess, 0, twoSlotsOption.MIN_BET());
-     *     _amountInSlotMore = bound(_amountInSlotMore, 0, twoSlotsOption.MIN_BET());
-     *
-     *     vm.assume(_amountInSlotLess < twoSlotsOption.MIN_BET() || _amountInSlotMore < twoSlotsOption.MIN_BET());
-     *
-     *     uint256 randomNetToShareBetweenWinners = _amountInSlotLess + _amountInSlotMore;
-     *     vm.expectRevert(
-     *         abi.encodeWithSelector(
-     *             TwoSlotsOption.InsufficientAmountInSlots.selector,
-     *             _amountInSlotLess,
-     *             _amountInSlotMore,
-     *             twoSlotsOption.MIN_BET()
-     *         )
-     *     );
-     *     TwoSlotsOption.Odds memory odds =
-     *         twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore, randomNetToShareBetweenWinners);
-     *
-     *     assertGe(odds.oddLess, odds.oddMore);
-     * }
-     *
-     *  function testFuzz_GetOdds_CheckIfLessHaveBiggerOddWhenLessMoneyInSlot(
-     *     uint256 _amountInSlotLess,
-     *     uint256 _amountInSlotMore
-     * ) public {
-     *     _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC, ONE_MILION_USDC - 1);
-     *     _amountInSlotMore = bound(_amountInSlotMore, ONE_MILION_USDC, HUNDRED_MILION_USDC);
-     *
-     *     SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
-     *         twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
-     *     uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
-     *     TwoSlotsOption.Odds memory odds =
-     *         twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore, netToShareBetweenWinners);
-     *
-     *     assertGe(odds.oddLess, odds.oddMore);
-     * }
-     *
-     * function testFuzz_GetOdds_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
-     *     uint256 _amountInSlotLess,
-     *     uint256 _amountInSlotMore
-     * ) public {
-     *     _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, TEN_THOUSAND_USDC);
-     *     _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC + 1, ONE_MILION_USDC);
-     *
-     *     SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
-     *         twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
-     *     uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
-     *     TwoSlotsOption.Odds memory odds =
-     *         twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore, netToShareBetweenWinners);
-     *     assertGe(odds.oddMore, odds.oddLess);
-     * }
-     *
-     * function testFuzz_GetOdds_AmountToShareIsBiggerThanRedisitributed(
-     *     uint256 _amountInSlotLess,
-     *     uint256 _amountInSlotMore
-     * ) public {
-     *     _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
-     *     _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
-     *
-     *     SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
-     *         twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
-     *     uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
-     *     TwoSlotsOption.Odds memory odds =
-     *         twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore, netToShareBetweenWinners);
-     *
-     *     uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / twoSlotsOption.PRECISION_FACTOR();
-     *     uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / twoSlotsOption.PRECISION_FACTOR();
-     *
-     *     assertGe(netToShareBetweenWinners, amountRedisitributedInLess);
-     *     assertGe(netToShareBetweenWinners, amountRedisitributedInMore);
-     * }
-     *
-     * function testFuzz_GetOdds_AmountRemainsLowerThanOnePenny(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
-     *     public
-     * {
-     *     _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
-     *     _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
-     *
-     *     SlotsOptionHelper.ContestFinancialData memory contestFinancialData =
-     *         twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
-     *     uint256 netToShareBetweenWinners = contestFinancialData.netToShareBetweenWinners;
-     *
-     *     TwoSlotsOption.Odds memory odds =
-     *         twoSlotsOption.getOdds(_amountInSlotLess, _amountInSlotMore, netToShareBetweenWinners);
-     *
-     *     uint256 amountRedisitributedInLess = (_amountInSlotLess * odds.oddLess) / twoSlotsOption.PRECISION_FACTOR();
-     *     uint256 amountRedisitributedInMore = (_amountInSlotMore * odds.oddMore) / twoSlotsOption.PRECISION_FACTOR();
-     *     uint256 amountRemainsInLess = netToShareBetweenWinners - amountRedisitributedInLess;
-     *     uint256 amountRemainsInMore = netToShareBetweenWinners - amountRedisitributedInMore;
-     *     uint256 ONE_PENNY = 1e3;
-     *
-     *     assertLt(amountRemainsInLess, ONE_PENNY);
-     *     assertLt(amountRemainsInMore, ONE_PENNY);
-     * }
-     */
+    function testFuzz_GetContestFinancialData_RevertIfInsufficientAmountInSlots(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotLess = bound(_amountInSlotLess, 0, twoSlotsOption.MIN_BET() - 1);
+        _amountInSlotMore = bound(_amountInSlotMore, 0, twoSlotsOption.MIN_BET() - 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TwoSlotsOption.InsufficientAmountInSlots.selector,
+                _amountInSlotLess,
+                _amountInSlotMore,
+                twoSlotsOption.MIN_BET()
+            )
+        );
+        twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+    }
+
+    function testFuzz_GetContestFinancialData_CheckIfLessHaveBiggerOddWhenLessMoneyInSlot(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC, ONE_MILION_USDC - 1);
+        _amountInSlotMore = bound(_amountInSlotMore, ONE_MILION_USDC, HUNDRED_MILION_USDC);
+
+        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+
+        assertGe(contestFinancialData.oddLess, contestFinancialData.oddMore);
+    }
+
+    function testFuzz_GetContestFinancialData_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, TEN_THOUSAND_USDC);
+        _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC + 1, ONE_MILION_USDC);
+
+        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        assertGe(contestFinancialData.oddMore, contestFinancialData.oddLess);
+    }
+
+    function testFuzz_GetContestFinancialData_AmountToShareIsBiggerThanRedisitributed(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
+
+        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+
+        uint256 amountRedisitributedInLess =
+            (_amountInSlotLess * contestFinancialData.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+        uint256 amountRedisitributedInMore =
+            (_amountInSlotMore * contestFinancialData.oddMore) / twoSlotsOption.PRECISION_FACTOR();
+
+        assertGe(contestFinancialData.netToShareBetweenWinners, amountRedisitributedInLess);
+        assertGe(contestFinancialData.netToShareBetweenWinners, amountRedisitributedInMore);
+    }
+
+    function testFuzz_GetContestFinancialData_AmountRemainsLowerThanOnePenny(
+        uint256 _amountInSlotLess,
+        uint256 _amountInSlotMore
+    ) public {
+        _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
+        _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
+
+        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        uint256 amountRedisitributedInLess =
+            (_amountInSlotLess * contestFinancialData.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+        uint256 amountRedisitributedInMore =
+            (_amountInSlotMore * contestFinancialData.oddMore) / twoSlotsOption.PRECISION_FACTOR();
+        uint256 amountRemainsInLess = contestFinancialData.netToShareBetweenWinners - amountRedisitributedInLess;
+        uint256 amountRemainsInMore = contestFinancialData.netToShareBetweenWinners - amountRedisitributedInMore;
+        uint256 ONE_PENNY = 1e3;
+
+        assertLt(amountRemainsInLess, ONE_PENNY);
+        assertLt(amountRemainsInMore, ONE_PENNY);
+    }
 
     function test_IsContestRefundable_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
         vm.warp(FIRST_MAY_2023);
