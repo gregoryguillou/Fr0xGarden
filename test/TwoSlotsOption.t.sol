@@ -750,5 +750,54 @@ contract TwoSlotsOptionTest is Test {
         assertEq(contractBalanceAfterWojakClaim, 0);
     }
 
-    //TODO: test_MOCKED_ClaimContest_AmountToClaimIsGoodWhenRefundedBecauseAmountOnlyInOneSlot() public {
+    function test_MOCKED_ClaimContest_AmountToClaimIsGoodWhenRefundedBecauseAmountOnlyInOneSlot() public {
+        vm.warp(_FIRST_MAY_2023);
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
+
+        vm.startPrank(wojak);
+        deal(_TOKEN0, wojak, ONE_MILION_USDC);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
+        MOCK_TwoSlotsOption.bet(lastContestID, ONE_MILION_USDC, MockTwoSlotsOption.SlotType.LESS);
+        vm.stopPrank();
+        vm.startPrank(milady);
+        deal(_TOKEN0, milady, ONE_MILION_USDC);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
+        MOCK_TwoSlotsOption.bet(lastContestID, TEN_THOUSAND_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+
+        vm.warp(_FIRST_MAY_2023 + 22 minutes);
+        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 maturityPrice = MOCK_TwoSlotsOption.getContestMaturityPrice(lastContestID);
+        assertTrue(startingPrice != maturityPrice);
+        SlotsOptionHelper.ContestStatus expectedStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+        SlotsOptionHelper.ContestStatus status = MOCK_TwoSlotsOption.getContestStatus(lastContestID);
+        assertEq(uint8(expectedStatus), uint8(status));
+
+        uint256 contractBalanceBeforeMiladyClaim = IERC20(_TOKEN0).balanceOf(address(MOCK_TwoSlotsOption));
+        emit log_named_uint("Contract Balance Before MiladyClaim", contractBalanceBeforeMiladyClaim);
+        assertEq(contractBalanceBeforeMiladyClaim, ONE_MILION_USDC + TEN_THOUSAND_USDC + FIVE_USDC);
+        uint256 miladyBalanceBeforeClaim = IERC20(_TOKEN0).balanceOf(milady);
+        emit log_named_uint("Milady Balance Before Claim", miladyBalanceBeforeClaim);
+        MOCK_TwoSlotsOption.claimContest(lastContestID);
+        vm.stopPrank();
+        uint256 miladyBalanceAfterClaim = IERC20(_TOKEN0).balanceOf(milady);
+        emit log_named_uint("Milady Balance After Claim", miladyBalanceAfterClaim);
+        assertEq(miladyBalanceAfterClaim, ONE_MILION_USDC);
+        uint256 contractBalanceAfterMiladyClaim = IERC20(_TOKEN0).balanceOf(address(MOCK_TwoSlotsOption));
+        emit log_named_uint("Contract Balance After Milady Claim", contractBalanceAfterMiladyClaim);
+        assertEq(contractBalanceAfterMiladyClaim, ONE_MILION_USDC);
+        uint256 wojakBalanceBeforeClaim = IERC20(_TOKEN0).balanceOf(wojak);
+        emit log_named_uint("Wojak Balance Before Claim", wojakBalanceBeforeClaim);
+        assertEq(wojakBalanceBeforeClaim, 0);
+        vm.startPrank(wojak);
+        MOCK_TwoSlotsOption.claimContest(lastContestID);
+        uint256 wojakBalanceAfterClaim = IERC20(_TOKEN0).balanceOf(wojak);
+        emit log_named_uint("Wojak Balance After Claim", wojakBalanceAfterClaim);
+        assertEq(wojakBalanceAfterClaim, ONE_MILION_USDC);
+        uint256 contractBalanceAfterWojakClaim = IERC20(_TOKEN0).balanceOf(address(MOCK_TwoSlotsOption));
+        emit log_named_uint("Contract Balance After Wojak Claim", contractBalanceAfterWojakClaim);
+        assertEq(contractBalanceAfterWojakClaim, 0);
+    }
 }
