@@ -258,6 +258,7 @@ contract MockTwoSlotsOption is Ownable {
     function getContestFinancialData(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
         public
         view
+        isSufficientAmountInSlots(_amountInSlotLess, _amountInSlotMore)
         returns (ContestFinancialData memory)
     {
         uint256 totalGrossBet = _amountInSlotLess + _amountInSlotMore;
