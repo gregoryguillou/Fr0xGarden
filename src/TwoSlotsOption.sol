@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: CC-BY-NC-ND-4.0 (Creative Commons Attribution Non Commercial No Derivatives 4.0 International)
+/* solhint-disable var-name-mixedcase */
+/* solhint-disable func-param-name-mixedcase */
 pragma solidity ^0.8.17;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -25,18 +27,18 @@ contract TwoSlotsOption is Ownable {
     address public immutable TOKEN1; // address of ERC20 Token use for Options (ex. ETH, ARB, WBTC,...)
     uint24 public UNISWAP_POOL_FEE; // fees of the desired Uniswap pool in order to use the V3 oracle features
     uint8 public SECONDS_FOR_ORACLE_TWAP; // fees of the desired Uniswap pool in order to use the V3 oracle features
-    UniswapV3TWAP uniswapV3TWAP;
+    UniswapV3TWAP private _uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
     uint256 public PRECISION_FACTOR = 1e12;
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
     uint8 public FEE_COLLECTOR_NUMERATOR; // numerator to calculate fees for collector
     uint8 public FEE_CREATOR_NUMERATOR; // numerator to calculate fees for creator
     uint8 public FEE_RESOLVER_NUMERATOR; // numerator to calculate fees for resolver
-    uint64 MAX_FEE_CREATOR = 5 * 1e6;
-    uint64 MAX_FEE_RESOLVER = 50 * 1e6;
+    uint64 public MAX_FEE_CREATOR = 5 * 1e6;
+    uint64 public MAX_FEE_RESOLVER = 50 * 1e6;
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
-    mapping(uint256 => Contest) contests; // mapping of all contests formatted as struct.
+    mapping(uint256 => Contest) private _contests; // mapping of all contests formatted as struct.
 
     constructor(
         address _FEES_COLLECTOR,
@@ -64,7 +66,7 @@ contract TwoSlotsOption is Ownable {
         FEE_RESOLVER_NUMERATOR = _FEE_RESOLVER_NUMERATOR;
         MIN_BET = _MIN_BET;
         EPOCH = _EPOCH;
-        uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
+        _uniswapV3TWAP = new UniswapV3TWAP(FACTORY, TOKEN0,TOKEN1,UNISWAP_POOL_FEE);
     }
 
     enum SlotType {
@@ -113,8 +115,8 @@ contract TwoSlotsOption is Ownable {
 
     modifier isCreateable() {
         if (
-            contests[LAST_OPEN_CONTEST_ID].contestStatus == SlotsOptionHelper.ContestStatus.OPEN
-                && block.timestamp < contests[LAST_OPEN_CONTEST_ID].closeAt
+            _contests[LAST_OPEN_CONTEST_ID].contestStatus == SlotsOptionHelper.ContestStatus.OPEN
+                && block.timestamp < _contests[LAST_OPEN_CONTEST_ID].closeAt
         ) {
             revert ContestIsAlreadyOpen({lastOpenContestID: LAST_OPEN_CONTEST_ID});
         }
@@ -122,22 +124,22 @@ contract TwoSlotsOption is Ownable {
     }
 
     modifier isContestOpen(uint256 _contestID) {
-        if (contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.OPEN) {
+        if (_contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.OPEN) {
             revert ContestNotOpen();
         }
         _;
     }
 
     modifier isContestInBettingPeriod(uint256 _contestID) {
-        if (block.timestamp >= contests[_contestID].closeAt) {
-            revert BettingPeriodExpired({actualTimestamp: block.timestamp, closeAt: contests[_contestID].closeAt});
+        if (block.timestamp >= _contests[_contestID].closeAt) {
+            revert BettingPeriodExpired({actualTimestamp: block.timestamp, closeAt: _contests[_contestID].closeAt});
         }
         _;
     }
 
     modifier isMature(uint256 _contestID) {
-        if (block.timestamp < contests[_contestID].maturityAt) {
-            revert ContestNotMature({actualTimestamp: block.timestamp, maturityAt: contests[_contestID].maturityAt});
+        if (block.timestamp < _contests[_contestID].maturityAt) {
+            revert ContestNotMature({actualTimestamp: block.timestamp, maturityAt: _contests[_contestID].maturityAt});
         }
         _;
     }
@@ -182,58 +184,67 @@ contract TwoSlotsOption is Ownable {
     event CloseContest(
         uint256 indexed _contestID, address indexed _resolver, SlotsOptionHelper.ContestStatus indexed _contestStatus
     );
+    event SplitFees(
+        uint256 indexed _contestID,
+        address indexed _creator,
+        address indexed _resolver,
+        address _collector,
+        uint256 _creatorAmount,
+        uint256 _resolverAmount,
+        uint256 _collectorAmount
+    );
 
-    function setLastOpenContestID(uint256 _id) internal {
+    function _setLastOpenContestID(uint256 _id) internal {
         LAST_OPEN_CONTEST_ID = _id;
     }
 
     function getContestStatus(uint256 _contestID) external view returns (SlotsOptionHelper.ContestStatus) {
-        return contests[_contestID].contestStatus;
+        return _contests[_contestID].contestStatus;
     }
 
     function getContestStartingPrice(uint256 _contestID) external view returns (uint256) {
-        return contests[_contestID].startingPrice;
+        return _contests[_contestID].startingPrice;
     }
 
     function getContestMaturityPrice(uint256 _contestID) external view returns (uint256) {
-        return contests[_contestID].maturityPrice;
+        return _contests[_contestID].maturityPrice;
     }
 
     function getContestCloseAtTimestamp(uint256 _contestID) external view returns (uint256) {
-        return contests[_contestID].closeAt;
+        return _contests[_contestID].closeAt;
     }
 
     function getContestMaturityAtTimestamp(uint256 _contestID) external view returns (uint256) {
-        return contests[_contestID].maturityAt;
+        return _contests[_contestID].maturityAt;
     }
 
     function getContestCreator(uint256 _contestID) external view returns (address) {
-        return contests[_contestID].creator;
+        return _contests[_contestID].creator;
     }
 
     function getContestResolver(uint256 _contestID) external view returns (address) {
-        return contests[_contestID].resolver;
+        return _contests[_contestID].resolver;
     }
 
     function getContestWinningSlot(uint256 _contestID) external view returns (WinningSlot) {
-        return contests[_contestID].winningSlot;
+        return _contests[_contestID].winningSlot;
     }
 
-    function getChosenSlot(uint256 _contestID, SlotType _slotType)
+    function _getChosenSlot(uint256 _contestID, SlotType _slotType)
         internal
         view
         returns (SlotsOptionHelper.Slot storage)
     {
-        return _slotType == SlotType.LESS ? contests[_contestID].slotLess : contests[_contestID].slotMore;
+        return _slotType == SlotType.LESS ? _contests[_contestID].slotLess : _contests[_contestID].slotMore;
     }
 
     function getAmountBetInSlot(uint256 _contestID, SlotType _slotType) public view returns (uint256) {
-        SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _slotType);
         return chosenSlot.totalAmount;
     }
 
     function getContestPayout(uint256 _contestID, SlotType _slotType) external view returns (uint256) {
-        SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _slotType);
         return chosenSlot.payout;
     }
 
@@ -242,7 +253,7 @@ contract TwoSlotsOption is Ownable {
         view
         returns (uint256)
     {
-        SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _slotType);
         return chosenSlot.options[_user].amount;
     }
 
@@ -251,7 +262,7 @@ contract TwoSlotsOption is Ownable {
         view
         returns (SlotsOptionHelper.OptionStatus)
     {
-        SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _slotType);
         return chosenSlot.options[_user].optionStatus;
     }
 
@@ -289,20 +300,21 @@ contract TwoSlotsOption is Ownable {
     function isContestRefundable(uint256 _contestID, uint256 _maturityPrice) public view returns (bool) {
         bool isSlotLessAmountNotValid = getAmountBetInSlot(_contestID, SlotType.LESS) < MIN_BET;
         bool isSlotMoreAmountNotValid = getAmountBetInSlot(_contestID, SlotType.MORE) < MIN_BET;
-        bool isStartingPriceEqualsMaturityPrice = contests[_contestID].startingPrice == _maturityPrice;
+        bool isStartingPriceEqualsMaturityPrice = _contests[_contestID].startingPrice == _maturityPrice;
 
         return isSlotLessAmountNotValid || isSlotMoreAmountNotValid || isStartingPriceEqualsMaturityPrice;
     }
 
     function createContest() external isCreateable returns (bool) {
         uint256 newContestID = LAST_OPEN_CONTEST_ID + 1;
-        contests[newContestID].contestStatus = SlotsOptionHelper.ContestStatus.OPEN;
-        contests[newContestID].startedAt = block.timestamp;
-        contests[newContestID].closeAt = block.timestamp + EPOCH;
-        contests[newContestID].maturityAt = block.timestamp + (EPOCH * 2);
-        contests[newContestID].creator = msg.sender;
-        contests[newContestID].startingPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
-        setLastOpenContestID(newContestID);
+        _contests[newContestID].contestStatus = SlotsOptionHelper.ContestStatus.OPEN;
+        _contests[newContestID].startedAt = block.timestamp;
+        _contests[newContestID].closeAt = block.timestamp + EPOCH;
+        _contests[newContestID].maturityAt = block.timestamp + (EPOCH * 2);
+        _contests[newContestID].creator = msg.sender;
+        _contests[newContestID].startingPrice =
+            _uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
+        _setLastOpenContestID(newContestID);
         emit CreateContest(newContestID, msg.sender);
         return true;
     }
@@ -316,7 +328,7 @@ contract TwoSlotsOption is Ownable {
         isSufficientAllowance(_amountToBet)
         returns (bool)
     {
-        SlotsOptionHelper.Slot storage chosenSlot = getChosenSlot(_contestID, _slotType);
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _slotType);
         chosenSlot.totalAmount += _amountToBet;
         bool isUserFirstBet =
             getOptionStatus(_contestID, _slotType, msg.sender) == SlotsOptionHelper.OptionStatus.UNDEFINED;
@@ -327,27 +339,39 @@ contract TwoSlotsOption is Ownable {
         return true;
     }
 
+    function _splitFees(uint256 _contestID, SlotsOptionHelper.Fees memory _fees) private {
+        IERC20(TOKEN0).safeTransfer(_contests[_contestID].creator, _fees.creator);
+        IERC20(TOKEN0).safeTransfer(_contests[_contestID].resolver, _fees.resolver);
+        IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, _fees.collector);
+        emit SplitFees(
+            _contestID,
+            _contests[_contestID].creator,
+            _contests[_contestID].resolver,
+            FEES_COLLECTOR,
+            _fees.creator,
+            _fees.resolver,
+            _fees.collector
+            );
+    }
+
     function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
-        uint256 maturityPrice = uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
+        uint256 maturityPrice = _uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
         bool isRefundable = isContestRefundable(_contestID, maturityPrice);
 
         if (isRefundable) {
-            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
+            _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
         } else {
             ContestFinancialData memory contestFinancialData = getContestFinancialData(
-                contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
+                _contests[_contestID].slotLess.totalAmount, _contests[_contestID].slotMore.totalAmount
             );
-            contests[_contestID].maturityPrice = maturityPrice;
-            contests[_contestID].resolver = msg.sender;
-            contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
-            contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
-            contests[_contestID].winningSlot =
-                maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
-            contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
-            IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
-            IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
-            IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
-            //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR
+            _contests[_contestID].maturityPrice = maturityPrice;
+            _contests[_contestID].resolver = msg.sender;
+            _contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
+            _contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
+            _contests[_contestID].winningSlot =
+                maturityPrice > _contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
+            _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+            _splitFees(_contestID, contestFinancialData.fees);
         }
         emit CloseContest(
             _contestID,
@@ -356,4 +380,5 @@ contract TwoSlotsOption is Ownable {
             );
         return true;
     }
+    //TODO: CREATE AND TEST CLAIM FUNCTION
 }
