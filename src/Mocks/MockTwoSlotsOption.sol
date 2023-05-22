@@ -282,7 +282,8 @@ contract MockTwoSlotsOption is Ownable {
             MAX_FEE_CREATOR,
             MAX_FEE_RESOLVER
         );
-        uint256 netToShareBetweenWinners = totalGrossBet - fees.total;
+        uint256 totalFees = fees.collector + fees.creator + fees.resolver;
+        uint256 netToShareBetweenWinners = totalGrossBet - totalFees;
         uint256 oddLess = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotLess;
         uint256 oddMore = netToShareBetweenWinners * PRECISION_FACTOR / _amountInSlotMore;
 

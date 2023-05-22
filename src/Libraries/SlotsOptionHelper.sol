@@ -39,7 +39,6 @@ library SlotsOptionHelper {
     }
 
     struct Fees {
-        uint256 total;
         uint256 collector;
         uint256 creator;
         uint256 resolver;
@@ -68,7 +67,7 @@ library SlotsOptionHelper {
         uint256 creator = creatorFees < _maxFeeCreator ? creatorFees : _maxFeeCreator;
         uint256 resolver = resolverFees < _maxFeeResolver ? resolverFees : _maxFeeResolver;
         uint256 collector = total - (creator + resolver);
-        return Fees({total: total, collector: collector, creator: creator, resolver: resolver});
+        return Fees({collector: collector, creator: creator, resolver: resolver});
     }
 
     function numToFixedLengthStr(uint256 _decimalPlaces, uint256 _num) public pure returns (string memory) {

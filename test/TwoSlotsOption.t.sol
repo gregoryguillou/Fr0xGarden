@@ -60,7 +60,8 @@ contract TwoSlotsOptionTest is Test {
             MAX_FEE_CREATOR,
             MAX_FEE_RESOLVER
         );
-        uint256 totalFees = fees.total;
+        uint256 totalFees = fees.collector + fees.creator + fees.resolver;
+
         emit log_named_uint("Amount Expected: ", totalFees);
         assertGt(totalFees, 0);
     }
@@ -78,7 +79,7 @@ contract TwoSlotsOptionTest is Test {
             MAX_FEE_CREATOR,
             MAX_FEE_RESOLVER
         );
-        uint256 totalFees = fees.total;
+        uint256 totalFees = fees.collector + fees.creator + fees.resolver;
         emit log_named_uint("Amount Expected: ", totalFees);
         uint256 allEntites = fees.collector + fees.creator + fees.resolver;
         emit log_named_uint("All Entites: ", allEntites);
@@ -98,7 +99,7 @@ contract TwoSlotsOptionTest is Test {
             MAX_FEE_CREATOR,
             MAX_FEE_RESOLVER
         );
-        uint256 totalFees = fees.total;
+        uint256 totalFees = fees.collector + fees.creator + fees.resolver;
         emit log_named_uint("Amount Expected: ", totalFees);
         emit log_named_uint("Fees Creator: ", fees.creator);
         emit log_named_uint("Fees Resolver: ", fees.resolver);
