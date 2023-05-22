@@ -365,7 +365,7 @@ contract MockTwoSlotsOption is Ownable {
             ? _uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP) + _fakeMaturityPrice
             : _uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP) - _fakeMaturityPrice;
         bool isRefundable = isContestRefundable(_contestID, maturityPrice);
-
+        _contests[_contestID].maturityPrice = maturityPrice;
         if (isRefundable) {
             _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
         } else {
@@ -374,12 +374,10 @@ contract MockTwoSlotsOption is Ownable {
                 _contests[_contestID].slotLess.totalAmount, _contests[_contestID].slotMore.totalAmount
             );
             _contests[_contestID].resolver = msg.sender;
-            _contests[_contestID].maturityPrice = maturityPrice;
             _contests[_contestID].winningSlot =
                 maturityPrice > _contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
             _contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
             _contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
-
             _splitFees(_contestID, contestFinancialData.fees);
         }
         emit CloseContest(
