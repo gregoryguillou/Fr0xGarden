@@ -368,16 +368,17 @@ contract MockTwoSlotsOption is Ownable {
         if (isRefundable) {
             _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
         } else {
+            _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
             ContestFinancialData memory contestFinancialData = getContestFinancialData(
                 _contests[_contestID].slotLess.totalAmount, _contests[_contestID].slotMore.totalAmount
             );
-            _contests[_contestID].maturityPrice = maturityPrice;
             _contests[_contestID].resolver = msg.sender;
-            _contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
-            _contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
+            _contests[_contestID].maturityPrice = maturityPrice;
             _contests[_contestID].winningSlot =
                 maturityPrice > _contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
-            _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+            _contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
+            _contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
+
             _splitFees(_contestID, contestFinancialData.fees);
         }
         emit CloseContest(
