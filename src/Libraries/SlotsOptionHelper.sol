@@ -24,7 +24,7 @@ library SlotsOptionHelper {
         UNDEFINED,
         CREATED,
         CLAIMED,
-        REFUND
+        REFUNDED
     }
 
     struct Option {

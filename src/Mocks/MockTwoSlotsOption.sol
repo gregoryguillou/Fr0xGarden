@@ -105,6 +105,8 @@ contract MockTwoSlotsOption is Ownable {
 
     error ContestIsAlreadyOpen(uint256 lastOpenContestID);
     error ContestNotOpen();
+    error ContestNotClose();
+    error UserHaveNothingToClaim();
     error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
     error ContestNotMature(uint256 actualTimestamp, uint256 maturityAt);
     error InsufficientBetAmount(uint256 amountBet, uint256 minBet);
@@ -179,6 +181,26 @@ contract MockTwoSlotsOption is Ownable {
         _;
     }
 
+    modifier isContestClose(uint256 _contestID) {
+        if (
+            _contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.RESOLVED
+                && _contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.REFUNDABLE
+        ) {
+            revert ContestNotClose();
+        }
+        _;
+    }
+
+    modifier isUserHaveToClaim(uint256 _contestID) {
+        if (
+            _contests[_contestID].slotLess.options[msg.sender].optionStatus != SlotsOptionHelper.OptionStatus.CREATED
+                && _contests[_contestID].slotMore.options[msg.sender].optionStatus != SlotsOptionHelper.OptionStatus.CREATED
+        ) {
+            revert UserHaveNothingToClaim();
+        }
+        _;
+    }
+
     event CreateContest(uint256 indexed _contestID, address indexed _creator);
     event Bet(uint256 indexed _contestID, address indexed _from, uint256 _amountBet, SlotType _isSlotMore);
     event CloseContest(
@@ -198,7 +220,7 @@ contract MockTwoSlotsOption is Ownable {
         LAST_OPEN_CONTEST_ID = _id;
     }
 
-    function getContestStatus(uint256 _contestID) external view returns (SlotsOptionHelper.ContestStatus) {
+    function getContestStatus(uint256 _contestID) public view returns (SlotsOptionHelper.ContestStatus) {
         return _contests[_contestID].contestStatus;
     }
 
@@ -226,7 +248,7 @@ contract MockTwoSlotsOption is Ownable {
         return _contests[_contestID].resolver;
     }
 
-    function getContestWinningSlot(uint256 _contestID) external view returns (WinningSlot) {
+    function getContestWinningSlot(uint256 _contestID) public view returns (WinningSlot) {
         return _contests[_contestID].winningSlot;
     }
 
@@ -249,7 +271,7 @@ contract MockTwoSlotsOption is Ownable {
     }
 
     function getAmountBetInOption(uint256 _contestID, SlotType _slotType, address _user)
-        external
+        public
         view
         returns (uint256)
     {
@@ -385,6 +407,33 @@ contract MockTwoSlotsOption is Ownable {
             msg.sender,
             isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
             );
+        return true;
+    }
+
+    function claimContest(uint256 _contestID)
+        external
+        isContestClose(_contestID)
+        isUserHaveToClaim(_contestID)
+        returns (bool)
+    {
+        SlotsOptionHelper.ContestStatus contestStatus = getContestStatus(_contestID);
+        bool isContestStatusRefundable = contestStatus == SlotsOptionHelper.ContestStatus.REFUNDABLE;
+        WinningSlot winningSlot = getContestWinningSlot(_contestID);
+        bool isWinningSlotIsLess = winningSlot == WinningSlot.LESS;
+
+        _contests[_contestID].slotLess.options[msg.sender].optionStatus =
+            isContestStatusRefundable ? SlotsOptionHelper.OptionStatus.REFUNDED : SlotsOptionHelper.OptionStatus.CLAIMED;
+
+        uint256 amountBetInLess = getAmountBetInOption(_contestID, SlotType.LESS, msg.sender);
+        uint256 amountBetInMore = getAmountBetInOption(_contestID, SlotType.MORE, msg.sender);
+
+        uint256 amountToClaim = isContestStatusRefundable
+            ? amountBetInLess + amountBetInMore
+            : isWinningSlotIsLess ? amountBetInLess : amountBetInMore;
+
+        // TODO: Test and check If amount to claim need to be divided by something once mult by payout
+        IERC20(TOKEN0).safeTransfer(msg.sender, amountToClaim);
+        //TODO: Create & emit event ClaimContest
         return true;
     }
 }
