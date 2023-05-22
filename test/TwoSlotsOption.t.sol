@@ -33,6 +33,9 @@ contract TwoSlotsOptionTest is Test {
     uint256 public EPOCH = 10 minutes; // duration of an epoch expressed in seconds
     address FEE_COLLECTOR = 0x00000000000000000000000000000000DeaDBeef;
     address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address wojak = makeAddr("wojak");
+    address milady = makeAddr("milady");
 
     function setUp() public {
         string memory ARBITRUM_RPC_URL = vm.envString("ARBITRUM_RPC_URL");
@@ -281,6 +284,8 @@ contract TwoSlotsOptionTest is Test {
         emit log_named_uint("Contract Balance After User Bet", contractBalanceAfterUserBet);
         assertEq(contractBalanceAfterUserBet, userBalanceBeforeBet);
     }
+
+    //TODO Put modifier amount in slot on getCOntestdata func
     /**
      * function testFuzz_GetOdds_RevertIfInsufficientAmountInSlots(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
      *     public
@@ -611,23 +616,62 @@ contract TwoSlotsOptionTest is Test {
 
     function test_MOCKED_CloseContest_CheckFeeDistribution() public {
         vm.warp(FIRST_MAY_2023);
+        vm.startPrank(alice);
         MOCK_TwoSlotsOption.createContest();
+        vm.stopPrank();
         uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        vm.startPrank(msg.sender);
-        deal(TOKEN0, msg.sender, ONE_MILION_USDC);
+
+        vm.startPrank(wojak);
+        deal(TOKEN0, wojak, ONE_MILION_USDC);
+        uint256 wojakBalanceBeforeBet = IERC20(TOKEN0).balanceOf(wojak);
+        emit log_named_uint("Wojak Balance Before Bet", wojakBalanceBeforeBet);
         IERC20(TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(lastContestID, ONE_MILION_USDC, MockTwoSlotsOption.SlotType.LESS);
+        vm.stopPrank();
+        uint256 wojakBalanceAfterBet = IERC20(TOKEN0).balanceOf(wojak);
+        emit log_named_uint("Wojak Balance After Bet", wojakBalanceAfterBet);
+
+        vm.startPrank(milady);
+        deal(TOKEN0, milady, ONE_MILION_USDC);
+        uint256 miladyBalanceBeforeBet = IERC20(TOKEN0).balanceOf(milady);
+        emit log_named_uint("Wojak Balance After Bet", miladyBalanceBeforeBet);
+        IERC20(TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
+        MOCK_TwoSlotsOption.bet(lastContestID, ONE_MILION_USDC, MockTwoSlotsOption.SlotType.MORE);
+        vm.stopPrank();
+        uint256 miladyBalanceAfterBet = IERC20(TOKEN0).balanceOf(milady);
+        emit log_named_uint("Milady Balance After Bet", miladyBalanceAfterBet);
+
+        uint256 contractBalanceBeforeClose = IERC20(TOKEN0).balanceOf(address(MOCK_TwoSlotsOption));
+        emit log_named_uint("Contract Balance Before Close & After Bet", contractBalanceBeforeClose);
+        uint256 collectorBalanceBeforeClose = IERC20(TOKEN0).balanceOf(FEE_COLLECTOR);
+        emit log_named_uint("Collector Balance Before Close & After Bet", collectorBalanceBeforeClose);
+        uint256 creatorBalanceBeforeClose = IERC20(TOKEN0).balanceOf(alice);
+        emit log_named_uint("Creator (Alice) Balance Before Close & After Bet", creatorBalanceBeforeClose);
+        uint256 resolverBalanceBeforeClose = IERC20(TOKEN0).balanceOf(bob);
+        emit log_named_uint("Resolver (Bob) Balance Before Close & After Bet", resolverBalanceBeforeClose);
+
         vm.warp(FIRST_MAY_2023 + 22 minutes);
+        vm.startPrank(bob);
         MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
         SlotsOptionHelper.ContestStatus expectedStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
         SlotsOptionHelper.ContestStatus status = MOCK_TwoSlotsOption.getContestStatus(lastContestID);
+        vm.stopPrank();
         assertEq(uint8(expectedStatus), uint8(status));
+        assertEq(alice, MOCK_TwoSlotsOption.getContestCreator(lastContestID));
+        assertEq(bob, MOCK_TwoSlotsOption.getContestResolver(lastContestID));
 
-        //TODO: Test balance resolver, creator, collector
-        MockTwoSlotsOption.WinningSlot expectedWinningSlot = MockTwoSlotsOption.WinningSlot.LESS;
-        MockTwoSlotsOption.WinningSlot winningSlot = MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID);
-        assertEq(uint8(expectedWinningSlot), uint8(winningSlot));
-        emit log_named_uint("winningSlot", uint8(winningSlot));
+        uint256 contractBalanceAfterClose = IERC20(TOKEN0).balanceOf(address(MOCK_TwoSlotsOption));
+        emit log_named_uint("Contract Balance After Close", contractBalanceAfterClose);
+        uint256 collectorBalanceAfterClose = IERC20(TOKEN0).balanceOf(FEE_COLLECTOR);
+        emit log_named_uint("Collector Balance After Close", collectorBalanceAfterClose);
+        uint256 creatorBalanceAfterClose = IERC20(TOKEN0).balanceOf(alice);
+        emit log_named_uint("Creator (Alice) Balance After Close", creatorBalanceAfterClose);
+        uint256 resolverBalanceAfterClose = IERC20(TOKEN0).balanceOf(bob);
+        emit log_named_uint("Resolver (Bob) Balance After Close", resolverBalanceAfterClose);
+
+        assertLt(contractBalanceAfterClose, contractBalanceBeforeClose);
+        assertGt(collectorBalanceAfterClose, collectorBalanceBeforeClose);
+        assertGt(creatorBalanceAfterClose, creatorBalanceBeforeClose);
+        assertGt(resolverBalanceAfterClose, resolverBalanceBeforeClose);
     }
 }

@@ -336,7 +336,6 @@ contract TwoSlotsOption is Ownable {
             ContestFinancialData memory contestFinancialData = getContestFinancialData(
                 contests[_contestID].slotLess.totalAmount, contests[_contestID].slotMore.totalAmount
             );
-
             contests[_contestID].maturityPrice = maturityPrice;
             contests[_contestID].resolver = msg.sender;
             contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
@@ -344,10 +343,9 @@ contract TwoSlotsOption is Ownable {
             contests[_contestID].winningSlot =
                 maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
             contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
-            //TODO:Create Function to change all states variables
-            //IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
-            //IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
-            //IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
+            IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
+            IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
+            IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
             //COPY IN MOCK AND TEST BY TESTING DIFFERENT BALANCES OF CREATOR RESOLVER AND COLLECTOR
         }
         emit CloseContest(
@@ -355,7 +353,6 @@ contract TwoSlotsOption is Ownable {
             msg.sender,
             isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
             );
-
         return true;
     }
 }

@@ -345,20 +345,20 @@ contract MockTwoSlotsOption is Ownable {
             );
             contests[_contestID].maturityPrice = maturityPrice;
             contests[_contestID].resolver = msg.sender;
-
             contests[_contestID].slotLess.payout = contestFinancialData.oddLess;
             contests[_contestID].slotMore.payout = contestFinancialData.oddMore;
             contests[_contestID].winningSlot =
                 maturityPrice > contests[_contestID].startingPrice ? WinningSlot.MORE : WinningSlot.LESS;
             contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
+            IERC20(TOKEN0).safeTransfer(contests[_contestID].creator, contestFinancialData.fees.creator);
+            IERC20(TOKEN0).safeTransfer(contests[_contestID].resolver, contestFinancialData.fees.resolver);
+            IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, contestFinancialData.fees.collector);
         }
-
         emit CloseContest(
             _contestID,
             msg.sender,
             isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
             );
-
         return true;
     }
 }
