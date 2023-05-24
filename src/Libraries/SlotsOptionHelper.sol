@@ -96,4 +96,12 @@ library SlotsOptionHelper {
         }
         return string(abi.encodePacked(quotient.toString(), ".", numToFixedLengthStr(_decimalPlaces, remainder)));
     }
+
+    function getAmountToPayoutIfResolved(uint256 _amountInUserOption, uint256 _payout, uint256 _precisionFactor)
+        public
+        pure
+        returns (uint256)
+    {
+        return (_amountInUserOption * _payout) / _precisionFactor;
+    }
 }

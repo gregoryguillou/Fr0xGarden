@@ -27,7 +27,7 @@ contract MockTwoSlotsOption is Ownable {
     address public immutable TOKEN1; // address of ERC20 Token use for Options (ex. ETH, ARB, WBTC,...)
     uint24 public UNISWAP_POOL_FEE; // fees of the desired Uniswap pool in order to use the V3 oracle features
     uint8 public SECONDS_FOR_ORACLE_TWAP; // fees of the desired Uniswap pool in order to use the V3 oracle features
-    UniswapV3TWAP private _uniswapV3TWAP;
+    UniswapV3TWAP internal _uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
     uint256 public PRECISION_FACTOR = 1e12; // used to allow for better accuracy of odds and redistribution of winnings
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
@@ -38,7 +38,7 @@ contract MockTwoSlotsOption is Ownable {
     uint64 public MAX_FEE_RESOLVER = 50 * 1e6;
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
-    mapping(uint256 => Contest) private _contests; // mapping of all contests formatted as struct.
+    mapping(uint256 => Contest) internal _contests; // mapping of all contests formatted as struct.
 
     constructor(
         address _FEES_COLLECTOR,
@@ -360,7 +360,6 @@ contract MockTwoSlotsOption is Ownable {
         bool isSlotLessAmountNotValid = getAmountBetInSlot(_contestID, SlotType.LESS) < MIN_BET;
         bool isSlotMoreAmountNotValid = getAmountBetInSlot(_contestID, SlotType.MORE) < MIN_BET;
         bool isStartingPriceEqualsMaturityPrice = _contests[_contestID].startingPrice == _maturityPrice;
-
         return isSlotLessAmountNotValid || isSlotMoreAmountNotValid || isStartingPriceEqualsMaturityPrice;
     }
 
@@ -398,7 +397,7 @@ contract MockTwoSlotsOption is Ownable {
         return true;
     }
 
-    function _splitFees(uint256 _contestID, SlotsOptionHelper.Fees memory _fees) private {
+    function _splitFees(uint256 _contestID, SlotsOptionHelper.Fees memory _fees) internal {
         IERC20(TOKEN0).safeTransfer(_contests[_contestID].creator, _fees.creator);
         IERC20(TOKEN0).safeTransfer(_contests[_contestID].resolver, _fees.resolver);
         IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, _fees.collector);
@@ -446,10 +445,6 @@ contract MockTwoSlotsOption is Ownable {
         return true;
     }
 
-    function _getAmountToPayoutIfResolved(uint256 _amountInUserOption, uint256 _payout) public view returns (uint256) {
-        return (_amountInUserOption * _payout) / PRECISION_FACTOR;
-    }
-
     function _askRefund(uint256 _contestID, uint256 _amountInOptionLess, uint256 _amountInOptionMore)
         internal
         isUserNeedRefund(_contestID, _amountInOptionLess, _amountInOptionMore)
@@ -478,8 +473,9 @@ contract MockTwoSlotsOption is Ownable {
         isUserNeedSettlement(_contestID, _amountInWinningOption, _winningSlot)
         returns (uint256)
     {
-        uint256 amountToSettle =
-            _getAmountToPayoutIfResolved(_amountInWinningOption, getContestPayout(_contestID, _winningSlot));
+        uint256 amountToSettle = SlotsOptionHelper.getAmountToPayoutIfResolved(
+            _amountInWinningOption, getContestPayout(_contestID, _winningSlot), PRECISION_FACTOR
+        );
         SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _winningSlot);
         chosenSlot.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.SETTLED;
         emit ClaimOption(_contestID, msg.sender, _winningSlot, SlotsOptionHelper.OptionStatus.SETTLED, amountToSettle);

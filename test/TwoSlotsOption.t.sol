@@ -291,81 +291,81 @@ contract TwoSlotsOptionTest is Test {
         assertEq(contractBalanceAfterUserBet, userBalanceBeforeBet);
     }
 
-    function testFuzz_GetContestFinancialData_RevertIfInsufficientAmountInSlots(
+    function testMockFuzz_GetContestFinancialData_RevertIfInsufficientAmountInSlots(
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
-        _amountInSlotLess = bound(_amountInSlotLess, 0, twoSlotsOption.MIN_BET() - 1);
-        _amountInSlotMore = bound(_amountInSlotMore, 0, twoSlotsOption.MIN_BET() - 1);
+        _amountInSlotLess = bound(_amountInSlotLess, 0, MOCK_TwoSlotsOption.MIN_BET() - 1);
+        _amountInSlotMore = bound(_amountInSlotMore, 0, MOCK_TwoSlotsOption.MIN_BET() - 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                TwoSlotsOption.InsufficientAmountInSlots.selector,
+                MockTwoSlotsOption.InsufficientAmountInSlots.selector,
                 _amountInSlotLess,
                 _amountInSlotMore,
                 twoSlotsOption.MIN_BET()
             )
         );
-        twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        MOCK_TwoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
     }
 
-    function testFuzz_GetContestFinancialData_CheckIfLessHaveBiggerOddWhenLessMoneyInSlot(
+    function testMockFuzz_GetContestFinancialData_CheckIfLessHaveBiggerOddWhenLessMoneyInSlot(
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
         _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC, ONE_MILION_USDC - 1);
         _amountInSlotMore = bound(_amountInSlotMore, ONE_MILION_USDC, HUNDRED_MILION_USDC);
 
-        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
-            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        MockTwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            MOCK_TwoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
 
         assertGe(contestFinancialData.oddLess, contestFinancialData.oddMore);
     }
 
-    function testFuzz_GetContestFinancialData_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
+    function testMockFuzz_GetContestFinancialData_CheckIfMoreHaveBiggerOddWhenLessMoneyInSlot(
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
         _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, TEN_THOUSAND_USDC);
         _amountInSlotLess = bound(_amountInSlotLess, TEN_THOUSAND_USDC + 1, ONE_MILION_USDC);
 
-        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
-            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        MockTwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            MOCK_TwoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
         assertGe(contestFinancialData.oddMore, contestFinancialData.oddLess);
     }
 
-    function testFuzz_GetContestFinancialData_AmountToShareIsBiggerThanRedisitributed(
+    function testMockFuzz_GetContestFinancialData_AmountToShareIsBiggerThanRedisitributed(
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
         _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
         _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
 
-        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
-            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        MockTwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            MOCK_TwoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
 
         uint256 amountRedisitributedInLess =
-            (_amountInSlotLess * contestFinancialData.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+            (_amountInSlotLess * contestFinancialData.oddLess) / MOCK_TwoSlotsOption.PRECISION_FACTOR();
         uint256 amountRedisitributedInMore =
-            (_amountInSlotMore * contestFinancialData.oddMore) / twoSlotsOption.PRECISION_FACTOR();
+            (_amountInSlotMore * contestFinancialData.oddMore) / MOCK_TwoSlotsOption.PRECISION_FACTOR();
 
         assertGe(contestFinancialData.netToShareBetweenWinners, amountRedisitributedInLess);
         assertGe(contestFinancialData.netToShareBetweenWinners, amountRedisitributedInMore);
     }
 
-    function testFuzz_GetContestFinancialData_AmountRemainsLowerThanOnePenny(
+    function testMockFuzz_GetContestFinancialData_AmountRemainsLowerThanOnePenny(
         uint256 _amountInSlotLess,
         uint256 _amountInSlotMore
     ) public {
         _amountInSlotLess = bound(_amountInSlotLess, FIVE_USDC, HUNDRED_MILION_USDC);
         _amountInSlotMore = bound(_amountInSlotMore, FIVE_USDC, HUNDRED_MILION_USDC);
 
-        TwoSlotsOption.ContestFinancialData memory contestFinancialData =
-            twoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
+        MockTwoSlotsOption.ContestFinancialData memory contestFinancialData =
+            MOCK_TwoSlotsOption.getContestFinancialData(_amountInSlotLess, _amountInSlotMore);
         uint256 amountRedisitributedInLess =
-            (_amountInSlotLess * contestFinancialData.oddLess) / twoSlotsOption.PRECISION_FACTOR();
+            (_amountInSlotLess * contestFinancialData.oddLess) / MOCK_TwoSlotsOption.PRECISION_FACTOR();
         uint256 amountRedisitributedInMore =
-            (_amountInSlotMore * contestFinancialData.oddMore) / twoSlotsOption.PRECISION_FACTOR();
+            (_amountInSlotMore * contestFinancialData.oddMore) / MOCK_TwoSlotsOption.PRECISION_FACTOR();
         uint256 amountRemainsInLess = contestFinancialData.netToShareBetweenWinners - amountRedisitributedInLess;
         uint256 amountRemainsInMore = contestFinancialData.netToShareBetweenWinners - amountRedisitributedInMore;
         uint256 ONE_PENNY = 1e3;
@@ -374,94 +374,94 @@ contract TwoSlotsOptionTest is Test {
         assertLt(amountRemainsInMore, ONE_PENNY);
     }
 
-    function test_IsContestRefundable_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
+    function testMock_IsContestRefundable_CheckIfTrueWhenTwoSlotsLowerThanMinBet() public {
         vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice + FIVE_USDC;
         vm.startPrank(msg.sender);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
 
-    function testFuzz_IsContestRefundableBecauseSlotsAmount_CheckIfTrueWhenSlotLessLowerThanMinBet(uint256 _amountToBet)
-        public
-    {
+    function testMockFuzz_IsContestRefundableBecauseSlotsAmount_CheckIfTrueWhenSlotLessLowerThanMinBet(
+        uint256 _amountToBet
+    ) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(msg.sender);
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
-        uint256 maturityPrice = startingPrice + FIVE_USDC;
-        deal(_TOKEN0, msg.sender, _amountToBet);
-        IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
-        assertTrue(contestRefundable);
-    }
-
-    function testFuzz_IsContestRefundable_CheckIfTrueWhenSlotMoreLowerThanMinBet(uint256 _amountToBet) public {
-        _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
-        vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
-        vm.startPrank(msg.sender);
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice + FIVE_USDC;
         deal(_TOKEN0, msg.sender, _amountToBet);
-        IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
 
-    function testFuzz_IsContestRefundable_CheckIfFalseWhenTwoSlotsBiggerThanMinBet(uint256 _amountToBet) public {
+    function testMockFuzz_IsContestRefundable_CheckIfTrueWhenSlotMoreLowerThanMinBet(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(msg.sender);
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 maturityPrice = startingPrice + FIVE_USDC;
+        deal(_TOKEN0, msg.sender, _amountToBet);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        assertTrue(contestRefundable);
+    }
+
+    function testMockFuzz_IsContestRefundable_CheckIfFalseWhenTwoSlotsBiggerThanMinBet(uint256 _amountToBet) public {
+        _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
+        vm.warp(_FIRST_MAY_2023);
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
+        vm.startPrank(msg.sender);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice + FIVE_USDC;
         deal(_TOKEN0, msg.sender, _amountToBet * 2);
-        IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet * 2);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertFalse(contestRefundable);
     }
 
-    function testFuzz_IsContestRefundable_CheckIfTrueWhenPricesEquals(uint256 _amountToBet) public {
+    function testMockFuzz_IsContestRefundable_CheckIfTrueWhenPricesEquals(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(msg.sender);
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice;
         deal(_TOKEN0, msg.sender, _amountToBet * 2);
-        IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet * 2);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertTrue(contestRefundable);
     }
 
-    function testFuzz_IsContestRefundable_CheckIfFalseWhenPricesNotEquals(uint256 _amountToBet) public {
+    function testMockFuzz_IsContestRefundable_CheckIfFalseWhenPricesNotEquals(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         vm.warp(_FIRST_MAY_2023);
-        twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
+        MOCK_TwoSlotsOption.createContest();
+        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(msg.sender);
-        uint256 startingPrice = twoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
         uint256 maturityPrice = startingPrice + FIVE_USDC;
         deal(_TOKEN0, msg.sender, _amountToBet * 2);
-        IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet * 2);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = twoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
+        IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet * 2);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, maturityPrice);
         assertFalse(contestRefundable);
     }
 

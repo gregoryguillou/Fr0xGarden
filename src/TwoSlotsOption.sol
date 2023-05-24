@@ -27,7 +27,7 @@ contract TwoSlotsOption is Ownable {
     address public immutable TOKEN1; // address of ERC20 Token use for Options (ex. ETH, ARB, WBTC,...)
     uint24 public UNISWAP_POOL_FEE; // fees of the desired Uniswap pool in order to use the V3 oracle features
     uint8 public SECONDS_FOR_ORACLE_TWAP; // fees of the desired Uniswap pool in order to use the V3 oracle features
-    UniswapV3TWAP private _uniswapV3TWAP;
+    UniswapV3TWAP internal _uniswapV3TWAP;
     uint256 public MIN_BET; // minimum amount to bet - to avoid spam attack & underflow
     uint256 public PRECISION_FACTOR = 1e12;
     uint8 public FEE_DENOMINATOR; // denominator to calculate fees
@@ -38,7 +38,7 @@ contract TwoSlotsOption is Ownable {
     uint64 public MAX_FEE_RESOLVER = 50 * 1e6;
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
-    mapping(uint256 => Contest) private _contests; // mapping of all contests formatted as struct.
+    mapping(uint256 => Contest) internal _contests; // mapping of all contests formatted as struct.
 
     constructor(
         address _FEES_COLLECTOR,
@@ -324,8 +324,8 @@ contract TwoSlotsOption is Ownable {
         return chosenSlot.options[_user].optionStatus;
     }
 
-    function getContestFinancialData(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
-        public
+    function _getContestFinancialData(uint256 _amountInSlotLess, uint256 _amountInSlotMore)
+        internal
         view
         isSufficientAmountInSlots(_amountInSlotLess, _amountInSlotMore)
         returns (ContestFinancialData memory)
@@ -356,11 +356,10 @@ contract TwoSlotsOption is Ownable {
         });
     }
 
-    function isContestRefundable(uint256 _contestID, uint256 _maturityPrice) public view returns (bool) {
+    function _isContestRefundable(uint256 _contestID, uint256 _maturityPrice) internal view returns (bool) {
         bool isSlotLessAmountNotValid = getAmountBetInSlot(_contestID, SlotType.LESS) < MIN_BET;
         bool isSlotMoreAmountNotValid = getAmountBetInSlot(_contestID, SlotType.MORE) < MIN_BET;
         bool isStartingPriceEqualsMaturityPrice = _contests[_contestID].startingPrice == _maturityPrice;
-
         return isSlotLessAmountNotValid || isSlotMoreAmountNotValid || isStartingPriceEqualsMaturityPrice;
     }
 
@@ -398,7 +397,7 @@ contract TwoSlotsOption is Ownable {
         return true;
     }
 
-    function _splitFees(uint256 _contestID, SlotsOptionHelper.Fees memory _fees) private {
+    function _splitFees(uint256 _contestID, SlotsOptionHelper.Fees memory _fees) internal {
         IERC20(TOKEN0).safeTransfer(_contests[_contestID].creator, _fees.creator);
         IERC20(TOKEN0).safeTransfer(_contests[_contestID].resolver, _fees.resolver);
         IERC20(TOKEN0).safeTransfer(FEES_COLLECTOR, _fees.collector);
@@ -415,13 +414,13 @@ contract TwoSlotsOption is Ownable {
 
     function closeContest(uint256 _contestID) external isContestOpen(_contestID) isMature(_contestID) returns (bool) {
         uint256 maturityPrice = _uniswapV3TWAP.estimateAmountOut(TOKEN1, 1 ether, SECONDS_FOR_ORACLE_TWAP);
-        bool isRefundable = isContestRefundable(_contestID, maturityPrice);
+        bool isRefundable = _isContestRefundable(_contestID, maturityPrice);
         _contests[_contestID].maturityPrice = maturityPrice;
         if (isRefundable) {
             _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.REFUNDABLE;
         } else {
             _contests[_contestID].contestStatus = SlotsOptionHelper.ContestStatus.RESOLVED;
-            ContestFinancialData memory contestFinancialData = getContestFinancialData(
+            ContestFinancialData memory contestFinancialData = _getContestFinancialData(
                 _contests[_contestID].slotLess.totalAmount, _contests[_contestID].slotMore.totalAmount
             );
             _contests[_contestID].resolver = msg.sender;
@@ -437,14 +436,6 @@ contract TwoSlotsOption is Ownable {
             isRefundable ? SlotsOptionHelper.ContestStatus.REFUNDABLE : SlotsOptionHelper.ContestStatus.RESOLVED
             );
         return true;
-    }
-
-    function _getAmountToPayoutIfResolved(uint256 _amountInUserOption, uint256 _payout)
-        internal
-        view
-        returns (uint256)
-    {
-        return (_amountInUserOption * _payout) / PRECISION_FACTOR;
     }
 
     function _askRefund(uint256 _contestID, uint256 _amountInOptionLess, uint256 _amountInOptionMore)
@@ -475,8 +466,9 @@ contract TwoSlotsOption is Ownable {
         isUserNeedSettlement(_contestID, _amountInWinningOption, _winningSlot)
         returns (uint256)
     {
-        uint256 amountToSettle =
-            _getAmountToPayoutIfResolved(_amountInWinningOption, getContestPayout(_contestID, _winningSlot));
+        uint256 amountToSettle = SlotsOptionHelper.getAmountToPayoutIfResolved(
+            _amountInWinningOption, getContestPayout(_contestID, _winningSlot), PRECISION_FACTOR
+        );
         SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _winningSlot);
         chosenSlot.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.SETTLED;
         emit ClaimOption(_contestID, msg.sender, _winningSlot, SlotsOptionHelper.OptionStatus.SETTLED, amountToSettle);
