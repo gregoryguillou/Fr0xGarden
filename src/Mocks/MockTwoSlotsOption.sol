@@ -106,14 +106,16 @@ contract MockTwoSlotsOption is Ownable {
     error ContestIsAlreadyOpen(uint256 lastOpenContestID);
     error ContestNotOpen();
     error ContestNotClose();
-    error UserHaveNothingToClaim();
+    error ContestNotRefundable();
+    error ContestNotResolved();
+    error UserNoNeedRefund();
+    error UserNoNeedSettlement();
     error BettingPeriodExpired(uint256 actualTimestamp, uint256 closeAt);
     error ContestNotMature(uint256 actualTimestamp, uint256 maturityAt);
     error InsufficientBetAmount(uint256 amountBet, uint256 minBet);
     error InsufficientBalance(uint256 userBalance, uint256 amountBet);
     error InsufficientAllowance(uint256 contractAllowance, uint256 amountBet);
     error InsufficientAmountInSlots(uint256 amountInSlotLess, uint256 amountInSlotMore, uint256 minRequired);
-    error MaxAmountInSlotReached(uint256 amountBet, SlotType slot, uint256 maxBetRemaining);
 
     modifier isCreateable() {
         if (
@@ -191,23 +193,39 @@ contract MockTwoSlotsOption is Ownable {
         _;
     }
 
-    modifier isUserHaveToClaim(uint256 _contestID) {
-        WinningSlot winningSlot = getContestWinningSlot(_contestID);
-        bool isResolved = winningSlot != WinningSlot.UNDEFINED;
-        uint256 userAmountOptionInLess = getAmountBetInOption(_contestID, SlotType.LESS, msg.sender);
-        uint256 userAmountOptionInMore = getAmountBetInOption(_contestID, SlotType.MORE, msg.sender);
+    modifier isContestStatusRefundable(uint256 _contestID) {
+        if (_contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.REFUNDABLE) {
+            revert ContestNotRefundable();
+        }
+        _;
+    }
 
-        if (isResolved) {
-            if (
-                (winningSlot == WinningSlot.LESS && userAmountOptionInLess == 0)
-                    || (winningSlot == WinningSlot.MORE && userAmountOptionInMore == 0)
-            ) {
-                revert UserHaveNothingToClaim();
-            }
-        } else {
-            if (userAmountOptionInLess == 0 && userAmountOptionInMore == 0) {
-                revert UserHaveNothingToClaim();
-            }
+    modifier isUserNeedRefund(uint256 _contestID, uint256 _amountInSlotLess, uint256 _amountInSlotMore) {
+        bool isLessOptionStatusCreated =
+            _contests[_contestID].slotLess.options[msg.sender].optionStatus == SlotsOptionHelper.OptionStatus.CREATED;
+        bool isMoreOptionStatusCreated =
+            _contests[_contestID].slotMore.options[msg.sender].optionStatus == SlotsOptionHelper.OptionStatus.CREATED;
+        bool isNeedRefundInLess = _amountInSlotLess > 0 && isLessOptionStatusCreated;
+        bool isNeedRefundInMore = _amountInSlotMore > 0 && isMoreOptionStatusCreated;
+        if (!isNeedRefundInLess && !isNeedRefundInMore) {
+            revert UserNoNeedRefund();
+        }
+        _;
+    }
+
+    modifier isContestStatusResolved(uint256 _contestID) {
+        if (_contests[_contestID].contestStatus != SlotsOptionHelper.ContestStatus.RESOLVED) {
+            revert ContestNotResolved();
+        }
+        _;
+    }
+
+    modifier isUserNeedSettlement(uint256 _contestID, uint256 _amountInWinningOption, SlotType _winningSlotType) {
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _winningSlotType);
+        bool isOptionStatusCreated =
+            chosenSlot.options[msg.sender].optionStatus == SlotsOptionHelper.OptionStatus.CREATED;
+        if (!(_amountInWinningOption > 0 && isOptionStatusCreated)) {
+            revert UserNoNeedSettlement();
         }
         _;
     }
@@ -432,71 +450,65 @@ contract MockTwoSlotsOption is Ownable {
         return (_amountInUserOption * _payout) / PRECISION_FACTOR;
     }
 
-    function _updateOption(uint256 _contestID, uint256 _amountInUserOptionLess, uint256 _amountInUserOptionMore)
+    function _askRefund(uint256 _contestID, uint256 _amountInOptionLess, uint256 _amountInOptionMore)
         internal
+        isUserNeedRefund(_contestID, _amountInOptionLess, _amountInOptionMore)
         returns (uint256)
     {
-        SlotsOptionHelper.ContestStatus contestStatus = getContestStatus(_contestID);
-        bool isContestStatusRefundable = contestStatus == SlotsOptionHelper.ContestStatus.REFUNDABLE;
-        WinningSlot winningSlot = getContestWinningSlot(_contestID);
-        bool isWinningSlotIsLess = winningSlot == WinningSlot.LESS;
-        uint256 payout = getContestPayout(_contestID, isWinningSlotIsLess ? SlotType.LESS : SlotType.MORE);
-        uint256 amountToClaim;
-
-        if (isContestStatusRefundable && _amountInUserOptionLess > 0) {
-            amountToClaim += _amountInUserOptionLess;
+        uint256 amountToRefund;
+        if (_amountInOptionLess > 0) {
+            amountToRefund += _amountInOptionLess;
             _contests[_contestID].slotLess.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.REFUNDED;
             emit ClaimOption(
-                _contestID, msg.sender, SlotType.LESS, SlotsOptionHelper.OptionStatus.REFUNDED, _amountInUserOptionLess
+                _contestID, msg.sender, SlotType.LESS, SlotsOptionHelper.OptionStatus.REFUNDED, _amountInOptionLess
                 );
         }
-        if (isContestStatusRefundable && _amountInUserOptionMore > 0) {
-            amountToClaim += _amountInUserOptionMore;
+        if (_amountInOptionMore > 0) {
+            amountToRefund += _amountInOptionMore;
             _contests[_contestID].slotMore.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.REFUNDED;
             emit ClaimOption(
-                _contestID, msg.sender, SlotType.MORE, SlotsOptionHelper.OptionStatus.REFUNDED, _amountInUserOptionMore
+                _contestID, msg.sender, SlotType.MORE, SlotsOptionHelper.OptionStatus.REFUNDED, _amountInOptionMore
                 );
         }
-
-        if (isWinningSlotIsLess && _amountInUserOptionLess > 0) {
-            amountToClaim += _getAmountToPayoutIfResolved(_amountInUserOptionLess, payout);
-            _contests[_contestID].slotLess.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.SETTLED;
-            emit ClaimOption(
-                _contestID,
-                msg.sender,
-                SlotType.LESS,
-                SlotsOptionHelper.OptionStatus.SETTLED,
-                _getAmountToPayoutIfResolved(_amountInUserOptionLess, payout)
-                );
-        }
-        if (!isWinningSlotIsLess && _amountInUserOptionMore > 0) {
-            amountToClaim += _getAmountToPayoutIfResolved(_amountInUserOptionMore, payout);
-            _contests[_contestID].slotMore.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.SETTLED;
-            emit ClaimOption(
-                _contestID,
-                msg.sender,
-                SlotType.MORE,
-                SlotsOptionHelper.OptionStatus.SETTLED,
-                _getAmountToPayoutIfResolved(_amountInUserOptionMore, payout)
-                );
-        }
-        return amountToClaim;
+        return amountToRefund;
     }
 
-    function claimContest(uint256 _contestID)
+    function _askSettlement(uint256 _contestID, uint256 _amountInWinningOption, SlotType _winningSlot)
+        internal
+        isUserNeedSettlement(_contestID, _amountInWinningOption, _winningSlot)
+        returns (uint256)
+    {
+        uint256 amountToSettle =
+            _getAmountToPayoutIfResolved(_amountInWinningOption, getContestPayout(_contestID, _winningSlot));
+        SlotsOptionHelper.Slot storage chosenSlot = _getChosenSlot(_contestID, _winningSlot);
+        chosenSlot.options[msg.sender].optionStatus = SlotsOptionHelper.OptionStatus.SETTLED;
+        emit ClaimOption(_contestID, msg.sender, _winningSlot, SlotsOptionHelper.OptionStatus.SETTLED, amountToSettle);
+        return amountToSettle;
+    }
+
+    function claimRefund(uint256 _contestID)
         external
         isContestClose(_contestID)
-        isUserHaveToClaim(_contestID)
+        isContestStatusRefundable(_contestID)
         returns (bool)
     {
-        uint256 amountToClaim = _updateOption(
-            _contestID,
-            getAmountBetInOption(_contestID, SlotType.LESS, msg.sender),
-            getAmountBetInOption(_contestID, SlotType.MORE, msg.sender)
-        );
-        // Check Option Status is CLAIMED OR REFUNDED;
-        // CHeck User have already claim can't no claim anymore
-        // TODO: FuzzTest
+        uint256 amountInOptionLess = getAmountBetInOption(_contestID, SlotType.LESS, msg.sender);
+        uint256 amountInOptionMore = getAmountBetInOption(_contestID, SlotType.MORE, msg.sender);
+        uint256 amountToClaim = _askRefund(_contestID, amountInOptionLess, amountInOptionMore);
+        IERC20(TOKEN0).safeTransfer(msg.sender, amountToClaim);
+        return true;
+    }
+
+    function claimSettlement(uint256 _contestID)
+        external
+        isContestClose(_contestID)
+        isContestStatusResolved(_contestID)
+        returns (bool)
+    {
+        WinningSlot winningSlot = getContestWinningSlot(_contestID);
+        SlotType winningSlotType = winningSlot == WinningSlot.LESS ? SlotType.LESS : SlotType.MORE;
+        uint256 amountInWinningOption = getAmountBetInOption(_contestID, winningSlotType, msg.sender);
+        uint256 amountToClaim = _askSettlement(_contestID, amountInWinningOption, winningSlotType);
         IERC20(TOKEN0).safeTransfer(msg.sender, amountToClaim);
         return true;
     }
