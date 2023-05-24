@@ -34,8 +34,8 @@ contract TwoSlotsOption is Ownable {
     uint8 public FEE_COLLECTOR_NUMERATOR; // numerator to calculate fees for collector
     uint8 public FEE_CREATOR_NUMERATOR; // numerator to calculate fees for creator
     uint8 public FEE_RESOLVER_NUMERATOR; // numerator to calculate fees for resolver
-    uint64 public MAX_FEE_CREATOR = 5 * 1e6;
-    uint64 public MAX_FEE_RESOLVER = 50 * 1e6;
+    uint256 public MAX_FEE_CREATOR = 5 * 1e6;
+    uint256 public MAX_FEE_RESOLVER = 50 * 1e6;
     uint256 public EPOCH; // duration of an epoch expressed in seconds
     uint256 public LAST_OPEN_CONTEST_ID; // ID of last contest open.
     mapping(uint256 => Contest) internal _contests; // mapping of all contests formatted as struct.
