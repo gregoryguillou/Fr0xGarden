@@ -18,3 +18,7 @@
 	path = lib/chainlink
 	url = https://github.com/smartcontractkit/chainlink
 	branch = v2.1.1
+[submodule "lib/pyth-sdk-solidity"]
+	path = lib/pyth-sdk-solidity
+	url = https://github.com/pyth-network/pyth-sdk-solidity
+	branch = v2.2.0
