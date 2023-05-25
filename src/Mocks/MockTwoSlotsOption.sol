@@ -268,6 +268,10 @@ contract MockTwoSlotsOption is Ownable {
         return _contests[_contestID].maturityPrice;
     }
 
+    function getContestStartedAtTimestamp(uint256 _contestID) external view returns (uint256) {
+        return _contests[_contestID].startedAt;
+    }
+
     function getContestCloseAtTimestamp(uint256 _contestID) external view returns (uint256) {
         return _contests[_contestID].closeAt;
     }

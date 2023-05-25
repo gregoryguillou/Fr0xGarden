@@ -10,7 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {MockTwoSlotsOption} from "../src/Mocks/MockTwoSlotsOption.sol";
 
-contract TwoSlotsOptionTest is Test {
+contract TwoSlotsOptionTestGetContestFinancialData is Test {
     using SafeERC20 for IERC20;
     using Strings for uint256;
 
@@ -48,9 +48,8 @@ contract TwoSlotsOptionTest is Test {
 
     function testMock_CheckIfTrueWhenNoBetsOnTwoSlots() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice + FIVE_USDC);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice + FIVE_USDC);
         assertTrue(contestRefundable);
     }
 

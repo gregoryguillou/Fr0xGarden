@@ -10,7 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {MockTwoSlotsOption} from "../src/Mocks/MockTwoSlotsOption.sol";
 
-contract TwoSlotsOptionTest is Test {
+contract TwoSlotsOptionTestIsContestRefundable is Test {
     using SafeERC20 for IERC20;
     using Strings for uint256;
 
@@ -46,65 +46,60 @@ contract TwoSlotsOptionTest is Test {
 
     function testMock_CheckIfTrueWhenNoBetsOnTwoSlots() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice + FIVE_USDC);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice + FIVE_USDC);
         assertTrue(contestRefundable);
     }
 
     function testMockFuzz_CheckIfTrueWhenSlotLessLowerThanMinBet(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice + FIVE_USDC);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice + FIVE_USDC);
         assertTrue(contestRefundable);
     }
 
     function testMockFuzz_CheckIfTrueWhenSlotMoreLowerThanMinBet(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice + FIVE_USDC);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice + FIVE_USDC);
         assertTrue(contestRefundable);
     }
 
     function testMockFuzz_CheckIfTrueWhenBetsOnTwoSlotsButEqualsPrices(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice);
         assertTrue(contestRefundable);
     }
 
     function testMockFuzz_CheckIfFalseWhenContestNotRefundable(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(lastContestID);
+        uint256 startingPrice = MOCK_TwoSlotsOption.getContestStartingPrice(1);
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountToBet);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
-        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(lastContestID, startingPrice + FIVE_USDC);
+        MOCK_TwoSlotsOption.bet(1, _amountToBet, MockTwoSlotsOption.SlotType.MORE);
+        bool contestRefundable = MOCK_TwoSlotsOption.isContestRefundable(1, startingPrice + FIVE_USDC);
         assertFalse(contestRefundable);
     }
 }

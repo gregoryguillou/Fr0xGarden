@@ -17,6 +17,7 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 // TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
 //TODO: add  MAX_FEE_CREATOR AND MAX_FEE_RESOLVER and setter to have flexibility and avoid stack too deep error in constructor
 // TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
+//TODO: CHainage de createContest avec closeContest ?
 
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
@@ -266,6 +267,10 @@ contract TwoSlotsOption is Ownable {
 
     function getContestMaturityPrice(uint256 _contestID) external view returns (uint256) {
         return _contests[_contestID].maturityPrice;
+    }
+
+    function getContestStartedAtTimestamp(uint256 _contestID) external view returns (uint256) {
+        return _contests[_contestID].startedAt;
     }
 
     function getContestCloseAtTimestamp(uint256 _contestID) external view returns (uint256) {

@@ -12,7 +12,7 @@ import {SlotsOptionHelper} from "../src/Libraries/SlotsOptionHelper.sol";
 import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 import {MockTwoSlotsOption} from "../src/Mocks/MockTwoSlotsOption.sol";
 
-contract TwoSlotsOptionTest is Test {
+contract TwoSlotsOptionTestCloseContest is Test {
     using SafeERC20 for IERC20;
     using Strings for uint256;
 
@@ -54,133 +54,108 @@ contract TwoSlotsOptionTest is Test {
     }
 
     function test__RevertIf_ContestNotOpen() public {
-        assertEq(uint8(twoSlotsOption.getContestStatus(10)), uint8(SlotsOptionHelper.ContestStatus.UNDEFINED));
+        assertTrue(twoSlotsOption.getContestStatus(10) == SlotsOptionHelper.ContestStatus.UNDEFINED);
         vm.expectRevert(TwoSlotsOption.ContestNotOpen.selector);
         twoSlotsOption.closeContest(10);
     }
 
     function test_RevertIf_ContestNotMature() public {
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.warp(_FIRST_MAY_2023 + 12 minutes);
-        uint256 maturityAt = twoSlotsOption.getContestMaturityAtTimestamp(lastContestID);
+        uint256 maturityAt = twoSlotsOption.getContestMaturityAtTimestamp(1);
         vm.expectRevert(abi.encodeWithSelector(TwoSlotsOption.ContestNotMature.selector, block.timestamp, maturityAt));
-        twoSlotsOption.closeContest(lastContestID);
+        twoSlotsOption.closeContest(1);
     }
 
     function test_CheckIfContestStatusRefundableWhenEqualsPrice() public {
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        twoSlotsOption.closeContest(lastContestID);
-        assertEq(
-            uint8(twoSlotsOption.getContestStatus(lastContestID)), uint8(SlotsOptionHelper.ContestStatus.REFUNDABLE)
-        );
+        twoSlotsOption.closeContest(1);
+        assertTrue(twoSlotsOption.getContestStatus(1) == SlotsOptionHelper.ContestStatus.REFUNDABLE);
     }
 
     function testMock_CheckIfContestStatusRefundableWhenOnlyOneSlotWithBet() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, true);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestStatus(lastContestID)),
-            uint8(SlotsOptionHelper.ContestStatus.REFUNDABLE)
-        );
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, true);
+        assertTrue(MOCK_TwoSlotsOption.getContestStatus(1) == SlotsOptionHelper.ContestStatus.REFUNDABLE);
     }
 
     function testMock_ContestStatusChangeIfResolved() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, true);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestStatus(lastContestID)), uint8(SlotsOptionHelper.ContestStatus.RESOLVED)
-        );
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, true);
+        assertTrue(MOCK_TwoSlotsOption.getContestStatus(1) == SlotsOptionHelper.ContestStatus.RESOLVED);
     }
 
     function testMock_CheckIfResolverWhenResolved() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, true);
-        assertEq(MOCK_TwoSlotsOption.getContestResolver(lastContestID), alice);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, true);
+        assertEq(MOCK_TwoSlotsOption.getContestResolver(1), alice);
     }
 
     function testMock_CheckWinningSlotWhenResolvedMore() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID)),
-            uint8(MockTwoSlotsOption.WinningSlot.UNDEFINED)
-        );
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, true);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID)), uint8(MockTwoSlotsOption.WinningSlot.MORE)
-        );
+        assertTrue(MOCK_TwoSlotsOption.getContestWinningSlot(1) == MockTwoSlotsOption.WinningSlot.UNDEFINED);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, true);
+        assertTrue(MOCK_TwoSlotsOption.getContestWinningSlot(1) == MockTwoSlotsOption.WinningSlot.MORE);
     }
 
     function testMock_CheckWinningSlotWhenResolvedLess() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID)),
-            uint8(MockTwoSlotsOption.WinningSlot.UNDEFINED)
-        );
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestWinningSlot(lastContestID)), uint8(MockTwoSlotsOption.WinningSlot.LESS)
-        );
+        assertTrue(MOCK_TwoSlotsOption.getContestWinningSlot(1) == MockTwoSlotsOption.WinningSlot.UNDEFINED);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
+        assertTrue(MOCK_TwoSlotsOption.getContestWinningSlot(1) == MockTwoSlotsOption.WinningSlot.LESS);
     }
 
     function testMock_CheckPayoutsWhenResolved() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
-        assertGt(MOCK_TwoSlotsOption.getContestPayout(lastContestID, MockTwoSlotsOption.SlotType.LESS), 0);
-        assertGt(MOCK_TwoSlotsOption.getContestPayout(lastContestID, MockTwoSlotsOption.SlotType.MORE), 0);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
+        assertGt(MOCK_TwoSlotsOption.getContestPayout(1, MockTwoSlotsOption.SlotType.LESS), 0);
+        assertGt(MOCK_TwoSlotsOption.getContestPayout(1, MockTwoSlotsOption.SlotType.MORE), 0);
     }
 
     function testMockFuzz_CheckFeeDistributedToCreator(uint256 _amountBetInLess, uint256 _amountBetInMore) public {
@@ -191,17 +166,16 @@ contract TwoSlotsOptionTest is Test {
         vm.startPrank(bob);
         MOCK_TwoSlotsOption.createContest();
         vm.stopPrank();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInLess);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInMore);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
         assertLe(IERC20(_TOKEN0).balanceOf(bob), MOCK_TwoSlotsOption.MAX_FEE_CREATOR());
     }
 
@@ -211,19 +185,18 @@ contract TwoSlotsOptionTest is Test {
         deal(_TOKEN0, wojak, _amountBetInLess);
         deal(_TOKEN0, alice, _amountBetInMore);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInLess);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInMore);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
         vm.stopPrank();
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
         vm.startPrank(bob);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
         assertLe(IERC20(_TOKEN0).balanceOf(bob), MOCK_TwoSlotsOption.MAX_FEE_RESOLVER());
     }
 
@@ -233,17 +206,16 @@ contract TwoSlotsOptionTest is Test {
         deal(_TOKEN0, wojak, _amountBetInLess);
         deal(_TOKEN0, alice, _amountBetInMore);
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInLess);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInLess, MockTwoSlotsOption.SlotType.LESS);
         vm.stopPrank();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), _amountBetInMore);
-        MOCK_TwoSlotsOption.bet(lastContestID, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, _amountBetInMore, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
         uint256 totalFees =
             SlotsOptionHelper.getFee(_amountBetInLess + _amountBetInMore, FEE_COLLECTOR_NUMERATOR, FEE_DENOMINATOR);
         uint256 creatorFees = SlotsOptionHelper.getFee(totalFees, FEE_CREATOR_NUMERATOR, FEE_DENOMINATOR);

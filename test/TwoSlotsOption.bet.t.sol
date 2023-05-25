@@ -12,7 +12,7 @@ import {SlotsOptionHelper} from "../src/Libraries/SlotsOptionHelper.sol";
 import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 import {MockTwoSlotsOption} from "../src/Mocks/MockTwoSlotsOption.sol";
 
-contract TwoSlotsOptionTest is Test {
+contract TwoSlotsOptionTestBet is Test {
     using SafeERC20 for IERC20;
     using Strings for uint256;
 
@@ -60,85 +60,75 @@ contract TwoSlotsOptionTest is Test {
 
     function test_RevertIf_ContestStatusREFUNDABLE() public {
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        twoSlotsOption.closeContest(lastContestID);
-        assertEq(
-            uint8(twoSlotsOption.getContestStatus(lastContestID)), uint8(SlotsOptionHelper.ContestStatus.REFUNDABLE)
-        );
+        twoSlotsOption.closeContest(1);
+        assertTrue(twoSlotsOption.getContestStatus(1) == SlotsOptionHelper.ContestStatus.REFUNDABLE);
         vm.expectRevert(TwoSlotsOption.ContestNotOpen.selector);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
     }
 
     function testMock_RevertIf_ContestStatusRESOLVED() public {
         MOCK_TwoSlotsOption.createContest();
-        uint256 lastContestID = MOCK_TwoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(wojak);
         IERC20(_TOKEN0).approve(address(MOCK_TwoSlotsOption), ONE_MILION_USDC);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.MORE);
         vm.warp(_FIRST_MAY_2023 + 22 minutes);
-        MOCK_TwoSlotsOption.mockCloseContest(lastContestID, FIVE_USDC, false);
-        assertEq(
-            uint8(MOCK_TwoSlotsOption.getContestStatus(lastContestID)), uint8(SlotsOptionHelper.ContestStatus.RESOLVED)
-        );
+        MOCK_TwoSlotsOption.mockCloseContest(1, FIVE_USDC, false);
+        assertTrue(MOCK_TwoSlotsOption.getContestStatus(1) == SlotsOptionHelper.ContestStatus.RESOLVED);
         vm.expectRevert(MockTwoSlotsOption.ContestNotOpen.selector);
-        MOCK_TwoSlotsOption.bet(lastContestID, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
+        MOCK_TwoSlotsOption.bet(1, FIVE_USDC, MockTwoSlotsOption.SlotType.LESS);
     }
 
     function test_RevertIf_ContestNotInBettingPeriod() public {
         twoSlotsOption.createContest();
         vm.warp(_FIRST_MAY_2023 + 11 minutes);
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
-        uint256 lastContestCloseAt = twoSlotsOption.getContestCloseAtTimestamp(lastContestID);
+        uint256 lastContestCloseAt = twoSlotsOption.getContestCloseAtTimestamp(1);
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.BettingPeriodExpired.selector, block.timestamp, lastContestCloseAt)
         );
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
     }
 
     function testFuzz_RevertIf_AmountBetIsLessThanOfMinBet(uint256 _amountToBet) public {
         vm.assume(_amountToBet < twoSlotsOption.MIN_BET());
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.expectRevert(
             abi.encodeWithSelector(
                 TwoSlotsOption.InsufficientBetAmount.selector, _amountToBet, twoSlotsOption.MIN_BET()
             )
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, _amountToBet, TwoSlotsOption.SlotType.LESS);
         vm.expectRevert(
             abi.encodeWithSelector(
                 TwoSlotsOption.InsufficientBetAmount.selector, _amountToBet, twoSlotsOption.MIN_BET()
             )
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, _amountToBet, TwoSlotsOption.SlotType.MORE);
     }
 
     function testFuzz_RevertIf_UserBalanceLessThanAmountToBet(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC - 1);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         deal(_TOKEN0, bob, _amountToBet);
         vm.startPrank(bob);
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.InsufficientBalance.selector, _amountToBet, ONE_MILION_USDC)
         );
-        twoSlotsOption.bet(lastContestID, ONE_MILION_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, ONE_MILION_USDC, TwoSlotsOption.SlotType.LESS);
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.InsufficientBalance.selector, _amountToBet, ONE_MILION_USDC)
         );
-        twoSlotsOption.bet(lastContestID, ONE_MILION_USDC, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, ONE_MILION_USDC, TwoSlotsOption.SlotType.MORE);
     }
 
     function testFuzz_RevertIf_UserAllowanceLessThanAmountToBet(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC, ONE_MILION_USDC);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         deal(_TOKEN0, bob, _amountToBet);
         vm.startPrank(bob);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), FIVE_USDC - 1);
@@ -146,66 +136,58 @@ contract TwoSlotsOptionTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.InsufficientAllowance.selector, contractAllowance, _amountToBet)
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, _amountToBet, TwoSlotsOption.SlotType.LESS);
         vm.expectRevert(
             abi.encodeWithSelector(TwoSlotsOption.InsufficientAllowance.selector, contractAllowance, _amountToBet)
         );
-        twoSlotsOption.bet(lastContestID, _amountToBet, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, _amountToBet, TwoSlotsOption.SlotType.MORE);
     }
 
     function testFuzz_Bet_CheckIfUserBetIncreaseTotalAmountInSlot(uint256 _amountToBet) public {
         _amountToBet = bound(_amountToBet, FIVE_USDC * 2, ONE_MILION_USDC);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountToBet);
-        twoSlotsOption.bet(lastContestID, _amountToBet / 2, TwoSlotsOption.SlotType.LESS);
-        uint256 expectedAmountInSlotLess =
-            twoSlotsOption.getAmountBetInSlot(lastContestID, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, _amountToBet / 2, TwoSlotsOption.SlotType.LESS);
+        uint256 expectedAmountInSlotLess = twoSlotsOption.getAmountBetInSlot(1, TwoSlotsOption.SlotType.LESS);
         assertEq(expectedAmountInSlotLess, _amountToBet / 2);
-        twoSlotsOption.bet(lastContestID, _amountToBet / 2, TwoSlotsOption.SlotType.MORE);
-        uint256 expectedAmountInSlotMore =
-            twoSlotsOption.getAmountBetInSlot(lastContestID, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, _amountToBet / 2, TwoSlotsOption.SlotType.MORE);
+        uint256 expectedAmountInSlotMore = twoSlotsOption.getAmountBetInSlot(1, TwoSlotsOption.SlotType.MORE);
         assertEq(expectedAmountInSlotMore, _amountToBet / 2);
     }
 
     function test_CheckIfUserBetChangeOptionStatusToCREATED() public {
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
         SlotsOptionHelper.OptionStatus expectedOptionStatus =
-            twoSlotsOption.getOptionStatus(lastContestID, TwoSlotsOption.SlotType.LESS, alice);
+            twoSlotsOption.getOptionStatus(1, TwoSlotsOption.SlotType.LESS, alice);
         assertTrue(SlotsOptionHelper.OptionStatus.CREATED == expectedOptionStatus);
     }
 
     function test_Bet_CheckIfUserBetIncreaseAmountInOption() public {
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(alice);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), ONE_MILION_USDC);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
-        uint256 expectedAmountInOptionLess =
-            twoSlotsOption.getAmountBetInOption(lastContestID, TwoSlotsOption.SlotType.LESS, alice);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.LESS);
+        uint256 expectedAmountInOptionLess = twoSlotsOption.getAmountBetInOption(1, TwoSlotsOption.SlotType.LESS, alice);
         assertEq(expectedAmountInOptionLess, FIVE_USDC * 2);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
-        twoSlotsOption.bet(lastContestID, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
-        uint256 expectedAmountInOptionMore =
-            twoSlotsOption.getAmountBetInOption(lastContestID, TwoSlotsOption.SlotType.LESS, alice);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, FIVE_USDC, TwoSlotsOption.SlotType.MORE);
+        uint256 expectedAmountInOptionMore = twoSlotsOption.getAmountBetInOption(1, TwoSlotsOption.SlotType.LESS, alice);
         assertEq(expectedAmountInOptionMore, FIVE_USDC * 2);
     }
 
     function testFuzz_CheckIfBalancesChangeWithBetOnLess(uint256 _amountBet) public {
         _amountBet = bound(_amountBet, FIVE_USDC, ONE_MILION_USDC);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(bob);
         deal(_TOKEN0, bob, _amountBet);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountBet);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), _amountBet);
-        twoSlotsOption.bet(lastContestID, _amountBet, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, _amountBet, TwoSlotsOption.SlotType.LESS);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
         assertEq(IERC20(_TOKEN0).balanceOf(address(twoSlotsOption)), _amountBet);
     }
@@ -213,12 +195,11 @@ contract TwoSlotsOptionTest is Test {
     function testFuzz_CheckIfBalancesChangeWithBetOnMore(uint256 _amountBet) public {
         _amountBet = bound(_amountBet, FIVE_USDC, ONE_MILION_USDC);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(bob);
         deal(_TOKEN0, bob, _amountBet);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountBet);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), _amountBet);
-        twoSlotsOption.bet(lastContestID, _amountBet, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, _amountBet, TwoSlotsOption.SlotType.MORE);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
         assertEq(IERC20(_TOKEN0).balanceOf(address(twoSlotsOption)), _amountBet);
     }
@@ -229,12 +210,11 @@ contract TwoSlotsOptionTest is Test {
         _amountBetOnLess = bound(_amountBetOnLess, FIVE_USDC, ONE_MILION_USDC);
         _amountBetOnMore = bound(_amountBetOnMore, FIVE_USDC, ONE_MILION_USDC);
         twoSlotsOption.createContest();
-        uint256 lastContestID = twoSlotsOption.LAST_OPEN_CONTEST_ID();
         vm.startPrank(bob);
         deal(_TOKEN0, bob, _amountBetOnLess);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountBetOnLess);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), _amountBetOnLess);
-        twoSlotsOption.bet(lastContestID, _amountBetOnLess, TwoSlotsOption.SlotType.LESS);
+        twoSlotsOption.bet(1, _amountBetOnLess, TwoSlotsOption.SlotType.LESS);
         assertEq(IERC20(_TOKEN0).balanceOf(bob), 0);
         assertEq(IERC20(_TOKEN0).balanceOf(address(twoSlotsOption)), _amountBetOnLess);
         vm.stopPrank();
@@ -242,7 +222,7 @@ contract TwoSlotsOptionTest is Test {
         deal(_TOKEN0, milady, _amountBetOnMore);
         IERC20(_TOKEN0).approve(address(twoSlotsOption), _amountBetOnMore);
         assertEq(IERC20(_TOKEN0).balanceOf(milady), _amountBetOnMore);
-        twoSlotsOption.bet(lastContestID, _amountBetOnMore, TwoSlotsOption.SlotType.MORE);
+        twoSlotsOption.bet(1, _amountBetOnMore, TwoSlotsOption.SlotType.MORE);
         assertEq(IERC20(_TOKEN0).balanceOf(milady), 0);
         assertEq(IERC20(_TOKEN0).balanceOf(address(twoSlotsOption)), _amountBetOnLess + _amountBetOnMore);
     }
