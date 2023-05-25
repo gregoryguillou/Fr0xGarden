@@ -1,18 +1,26 @@
-import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+// SPDX-License-Identifier: UNLICENSED
+/* solhint-disable var-name-mixedcase */
+/* solhint-disable func-name-mixedcase */
+pragma solidity ^0.8.17;
 
-contract ExampleContract {
+import {IPyth} from "@pythnetwork/IPyth.sol";
+import {PythStructs} from "@pythnetwork/PythStructs.sol";
+
+contract PythPriceData {
     IPyth pyth;
 
-    constructor(address pythContract) {
-        pyth = IPyth(pythContract);
+    bytes32 ETH_PRICE_ID;
+
+    //TODO: Implement test
+    constructor(address _pythContract, bytes32 _ethPriceId) {
+        pyth = IPyth(_pythContract);
+        ETH_PRICE_ID = _ethPriceId;
     }
 
-    function getBtcUsdPrice(bytes[] calldata priceUpdateData) public payable returns (PythStructs.Price memory) {
-        uint256 fee = pyth.getUpdateFee(priceUpdateData);
-        pyth.updatePriceFeeds{value: fee}(priceUpdateData);
+    function getETHUSDPrice(bytes[] calldata _priceUpdateData) public payable returns (PythStructs.Price memory) {
+        uint256 fee = pyth.getUpdateFee(_priceUpdateData);
+        pyth.updatePriceFeeds{value: fee}(_priceUpdateData);
 
-        bytes32 priceID = 0xf9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b;
-        return pyth.getPrice(priceID);
+        return pyth.getPrice(ETH_PRICE_ID);
     }
 }

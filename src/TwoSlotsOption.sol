@@ -20,6 +20,7 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 //TODO: Do I use Ownable of OZ on this contract ? if yes Use Only Owner on function where its needed !!
 //TODO: CHainage de createContest avec closeContest ?
 //TODO: Quel Oracle utiliser ? SI Chainlink le mettre en place ?
+//TODO: Faire des tests sur tous les emit d'events
 
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;

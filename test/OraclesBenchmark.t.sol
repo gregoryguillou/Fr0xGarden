@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import {UniswapV3TWAP} from "../src/UniswapV3TWAP.sol";
 import {ChainlinkPriceConsumerV3} from "../src/ChainlinkPriceConsumerV3.sol";
+import {PythPriceData} from "../src/PythPriceData.sol";
 
 contract OraclesBenchmark is Test {
     uint256 private _arbitrumFork;
@@ -15,15 +16,27 @@ contract OraclesBenchmark is Test {
     address private _TOKEN1 = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // WETH on Arbitrum network
     uint24 private _UNISWAP_POOL_FEE = 3000;
     ChainlinkPriceConsumerV3 public chainlinkPriceConsumerV3;
-    address private _PRICE_FEED_ADDRESS = 0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612; // Chainlink address of ETH/USD PRICE FEED on Arbitrum network.
+    address private _CHAINLINK_PRICE_FEED_ADDRESS = 0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612; // Chainlink address of ETH/USD PRICE FEED on Arbitrum network.
+    PythPriceData public pythPriceData;
+    address private _PYTH_PRICE_FEED_ADDRESS = 0xff1a0f4744e8582DF1aE09D5611b887B6a12925C; // Pyth address of ETH/USD PRICE FEED on Arbitrum network.
+    bytes32 _ETH_PRICE_ID = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace; //Pyth Eth Price id;
 
     function setUp() public {
         string memory ARBITRUM_RPC_URL = vm.envString("ARBITRUM_RPC_URL");
         _arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
         vm.selectFork(_arbitrumFork);
         uniswapV3TWAP = new UniswapV3TWAP(_FACTORY, _TOKEN0,_TOKEN1,_UNISWAP_POOL_FEE);
-        chainlinkPriceConsumerV3 = new ChainlinkPriceConsumerV3(_PRICE_FEED_ADDRESS);
+        chainlinkPriceConsumerV3 = new ChainlinkPriceConsumerV3(_CHAINLINK_PRICE_FEED_ADDRESS);
+        pythPriceData = new PythPriceData(_PYTH_PRICE_FEED_ADDRESS,_ETH_PRICE_ID);
     }
+
+    /*
+    function test_PYTH_getLatestPrice() public {
+        int64 price = pythPriceData.getETHUSDPrice().price;
+        emit log_named_int("Pytg ETH/USD LATEST PRICE", price);
+        assertGe(price, 0);
+    }
+    */
 
     function test_CHAINLINK_getLatestPrice() public {
         int256 price = chainlinkPriceConsumerV3.getLatestPrice();
