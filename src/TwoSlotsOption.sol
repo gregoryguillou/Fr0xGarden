@@ -17,6 +17,7 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 // TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
 //TODO: add  MAX_FEE_CREATOR AND MAX_FEE_RESOLVER and setter to have flexibility and avoid stack too deep error in constructor
 // TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
+//TODO: Do I use Ownable of OZ on this contract ? if yes Use Only Owner on function where its needed !!
 //TODO: CHainage de createContest avec closeContest ?
 
 contract TwoSlotsOption is Ownable {

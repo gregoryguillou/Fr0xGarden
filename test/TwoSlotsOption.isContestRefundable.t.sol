@@ -7,12 +7,10 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {MockTwoSlotsOption} from "../src/Mocks/MockTwoSlotsOption.sol";
 
 contract TwoSlotsOptionTestIsContestRefundable is Test {
     using SafeERC20 for IERC20;
-    using Strings for uint256;
 
     MockTwoSlotsOption public MOCK_TwoSlotsOption;
     uint256 _arbitrumFork;

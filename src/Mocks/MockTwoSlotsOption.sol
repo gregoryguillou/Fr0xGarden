@@ -13,11 +13,6 @@ import {UniswapV3TWAP} from "../UniswapV3TWAP.sol";
 /// @author @fr0xMaster
 /// @notice MOCK VERSION of Mutual Slots implementation of Two Slots Option contract To Help Testing Logic without integration limitations.
 
-// TODO: Put function setter on Global variable to change FeeCollector,  Fee numerator, etc...;
-// TODO: change usage of '1ether' in estimateAmountOut call to let possibility to do it with erc20 token
-//TODO: add  MAX_FEE_CREATOR AND MAX_FEE_RESOLVER and setter to have flexibility and avoid stack too deep error in constructor
-// TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
-
 contract MockTwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;
 

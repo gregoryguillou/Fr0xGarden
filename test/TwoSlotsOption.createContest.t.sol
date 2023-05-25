@@ -7,13 +7,11 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {SlotsOptionHelper} from "../src/Libraries/SlotsOptionHelper.sol";
 import {TwoSlotsOption} from "../src/TwoSlotsOption.sol";
 
 contract TwoSlotsOptionTestCreateContest is Test {
     using SafeERC20 for IERC20;
-    using Strings for uint256;
 
     TwoSlotsOption public twoSlotsOption;
     uint256 _arbitrumFork;
