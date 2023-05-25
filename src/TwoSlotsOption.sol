@@ -19,6 +19,7 @@ import {UniswapV3TWAP} from "./UniswapV3TWAP.sol";
 // TODO: add modifier to check before first bet is created all state var not in constrcuor are all sets !!
 //TODO: Do I use Ownable of OZ on this contract ? if yes Use Only Owner on function where its needed !!
 //TODO: CHainage de createContest avec closeContest ?
+//TODO: Quel Oracle utiliser ? SI Chainlink le mettre en place ?
 
 contract TwoSlotsOption is Ownable {
     using SafeERC20 for IERC20;

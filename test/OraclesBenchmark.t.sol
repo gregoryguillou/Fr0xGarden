@@ -66,6 +66,4 @@ contract OraclesBenchmark is Test {
         emit log_named_uint("TWAP Price 60000 Seconds Ago", price);
         assertGe(price, 0);
     }
-
-    //TODO: test if differents price with différents seconds in function estimateAmountOut.
 }
